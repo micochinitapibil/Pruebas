@@ -1770,12 +1770,327 @@
             cursor: not-allowed;
             transform: none;
         }
+
+        /* ============================================
+           LOGIN DE CLIENTES
+           ============================================ */
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #241B10 0%, #5c3d10 60%, #8A6116 100%);
+            z-index: 5000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-overlay[hidden] {
+            display: none;
+        }
+
+        .auth-card {
+            background: #FBF0D6;
+            border-radius: 24px;
+            max-width: 380px;
+            width: 100%;
+            max-height: 92vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+            padding: 32px 28px;
+            text-align: center;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .auth-card img {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 8px;
+        }
+
+        .auth-card h2 {
+            font-size: 22px;
+            color: var(--accent);
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .auth-card .auth-subtitle {
+            font-size: 14px;
+            color: #6b5a3e;
+            margin-bottom: 22px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            background: rgba(138, 97, 22, 0.12);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .auth-tab.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(201, 162, 39, 0.4);
+        }
+
+        .auth-field {
+            text-align: left;
+            margin-bottom: 14px;
+        }
+
+        .auth-field label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        .auth-field input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid rgba(138, 97, 22, 0.25);
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 15px;
+            background: white;
+            transition: border-color 0.25s ease;
+        }
+
+        .auth-field input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .auth-error {
+            display: none;
+            background: #fdecea;
+            color: #c0392b;
+            font-size: 13px;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            text-align: left;
+        }
+
+        .auth-submit-btn {
+            width: 100%;
+            background: linear-gradient(120deg, var(--secondary), var(--primary));
+            color: white;
+            border: none;
+            padding: 13px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 4px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .auth-submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(201, 162, 39, 0.4);
+        }
+
+        .auth-submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0 16px;
+            color: #a3906a;
+            font-size: 12px;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(138, 97, 22, 0.25);
+        }
+
+        .auth-guest-btn {
+            width: 100%;
+            background: transparent;
+            border: 2px solid var(--secondary);
+            color: var(--secondary);
+            padding: 12px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .auth-guest-btn:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        /* Indicador de cuenta en el header */
+        .user-menu {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .user-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            height: 42px;
+            padding: 0 14px 0 12px;
+            border-radius: 21px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+            font-family: inherit;
+            max-width: 140px;
+        }
+
+        .user-btn:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .user-btn span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+            padding: 8px;
+            min-width: 190px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.25s ease;
+            z-index: 1001;
+            text-align: left;
+        }
+
+        .user-dropdown.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .user-dropdown .user-dropdown-email {
+            font-size: 12px;
+            color: #8a7554;
+            padding: 8px 10px 4px;
+            word-break: break-all;
+        }
+
+        .user-dropdown button {
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-dropdown button:hover {
+            background: rgba(138, 97, 22, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .user-btn {
+                width: 36px;
+                height: 36px;
+                padding: 0;
+                justify-content: center;
+                border-radius: 50%;
+            }
+            .user-btn span {
+                display: none;
+            }
+            .user-dropdown {
+                right: -8px;
+            }
+        }
     </style>
     <!-- Firebase (CDN, compat SDK - vanilla JS, sin npm) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
+    <!-- LOGIN DE CLIENTES -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+            <img src="./logo.png" alt="Mi Cochinita Pibil">
+            <h2>Mi Cochinita Pibil</h2>
+            <div class="auth-subtitle">Inicia sesión o regístrate para continuar</div>
+
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" id="authTabLogin">Iniciar sesión</button>
+                <button type="button" class="auth-tab" id="authTabRegister">Crear cuenta</button>
+            </div>
+
+            <div class="auth-error" id="authError"></div>
+
+            <form id="authForm">
+                <div class="auth-field">
+                    <label for="authEmail">Correo electrónico</label>
+                    <input type="email" id="authEmail" autocomplete="email" required>
+                </div>
+                <div class="auth-field">
+                    <label for="authPassword">Contraseña</label>
+                    <input type="password" id="authPassword" autocomplete="current-password" required minlength="6">
+                </div>
+                <button type="submit" class="auth-submit-btn" id="authSubmitBtn">Iniciar sesión</button>
+            </form>
+
+            <div class="auth-divider">o</div>
+
+            <button type="button" class="auth-guest-btn" id="authGuestBtn">Continuar como invitado</button>
+        </div>
+    </div>
+
     <!-- HEADER -->
     <header>
         <div class="container">
@@ -1792,6 +2107,16 @@
                     <a href="#contacto">Ubicación</a>
                 </nav>
                 <div class="header-actions">
+                    <div class="user-menu">
+                        <button class="user-btn" id="userBtn" aria-label="Mi cuenta">
+                            <i class="fas fa-user"></i>
+                            <span id="userBtnLabel">Invitado</span>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <div class="user-dropdown-email" id="userDropdownEmail"></div>
+                            <button type="button" id="userLogoutBtn"><i class="fas fa-right-from-bracket"></i> Cerrar sesión</button>
+                        </div>
+                    </div>
                     <button class="cart-btn" id="cartBtn" aria-label="Ver carrito">
                         <i class="fas fa-shopping-cart"></i>
                         <span class="cart-badge" id="cartBadge">0</span>
@@ -2111,6 +2436,140 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // ============================================
+        // LOGIN DE CLIENTES
+        // ============================================
+        let isGuest = false;
+
+        const authOverlay = document.getElementById('authOverlay');
+        const authTabLogin = document.getElementById('authTabLogin');
+        const authTabRegister = document.getElementById('authTabRegister');
+        const authForm = document.getElementById('authForm');
+        const authEmail = document.getElementById('authEmail');
+        const authPassword = document.getElementById('authPassword');
+        const authSubmitBtn = document.getElementById('authSubmitBtn');
+        const authError = document.getElementById('authError');
+        const authGuestBtn = document.getElementById('authGuestBtn');
+
+        const userBtn = document.getElementById('userBtn');
+        const userBtnLabel = document.getElementById('userBtnLabel');
+        const userDropdown = document.getElementById('userDropdown');
+        const userDropdownEmail = document.getElementById('userDropdownEmail');
+        const userLogoutBtn = document.getElementById('userLogoutBtn');
+
+        let authMode = 'login'; // 'login' | 'register'
+
+        function setAuthMode(mode) {
+            authMode = mode;
+            authError.style.display = 'none';
+            if (mode === 'login') {
+                authTabLogin.classList.add('active');
+                authTabRegister.classList.remove('active');
+                authSubmitBtn.textContent = 'Iniciar sesión';
+                authPassword.setAttribute('autocomplete', 'current-password');
+            } else {
+                authTabRegister.classList.add('active');
+                authTabLogin.classList.remove('active');
+                authSubmitBtn.textContent = 'Crear cuenta';
+                authPassword.setAttribute('autocomplete', 'new-password');
+            }
+        }
+
+        authTabLogin.addEventListener('click', () => setAuthMode('login'));
+        authTabRegister.addEventListener('click', () => setAuthMode('register'));
+
+        function showAuthError(message) {
+            authError.textContent = message;
+            authError.style.display = 'block';
+        }
+
+        function friendlyAuthError(err) {
+            switch (err.code) {
+                case 'auth/invalid-email':
+                    return 'Ese correo no es válido.';
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    return 'Correo o contraseña incorrectos.';
+                case 'auth/email-already-in-use':
+                    return 'Ya existe una cuenta con ese correo. Intenta iniciar sesión.';
+                case 'auth/weak-password':
+                    return 'La contraseña debe tener al menos 6 caracteres.';
+                default:
+                    return 'Ocurrió un error. Intenta de nuevo.';
+            }
+        }
+
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            authError.style.display = 'none';
+            const email = authEmail.value.trim();
+            const password = authPassword.value;
+            if (!email || !password) return;
+
+            authSubmitBtn.disabled = true;
+            const action = authMode === 'login'
+                ? auth.signInWithEmailAndPassword(email, password)
+                : auth.createUserWithEmailAndPassword(email, password);
+
+            action
+                .catch(err => showAuthError(friendlyAuthError(err)))
+                .finally(() => { authSubmitBtn.disabled = false; });
+        });
+
+        authGuestBtn.addEventListener('click', () => {
+            isGuest = true;
+            authOverlay.setAttribute('hidden', '');
+            updateUserUI(null);
+        });
+
+        function updateUserUI(user) {
+            if (user) {
+                userBtnLabel.textContent = user.email.split('@')[0];
+                userDropdownEmail.textContent = user.email;
+                userLogoutBtn.style.display = 'flex';
+            } else {
+                userBtnLabel.textContent = 'Invitado';
+                userDropdownEmail.textContent = 'Sesión de invitado';
+                userLogoutBtn.style.display = isGuest ? 'flex' : 'none';
+            }
+        }
+
+        userBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userDropdown.classList.toggle('active');
+        });
+
+        document.addEventListener('click', () => {
+            userDropdown.classList.remove('active');
+        });
+
+        userLogoutBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (auth.currentUser) {
+                auth.signOut();
+            } else {
+                // Era invitado: solo recargamos para volver a mostrar el login
+                isGuest = false;
+                window.location.reload();
+            }
+        });
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                isGuest = false;
+                authOverlay.setAttribute('hidden', '');
+                authForm.reset();
+                updateUserUI(user);
+            } else if (isGuest) {
+                updateUserUI(null);
+            } else {
+                authOverlay.removeAttribute('hidden');
+                updateUserUI(null);
+            }
+        });
 
         // ============================================
         // AJUSTAR ALTURA REAL DEL HEADER (para el sticky del menú)

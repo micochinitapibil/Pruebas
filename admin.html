@@ -379,6 +379,7 @@
     const CLOUDINARY_CLOUD_NAME = "e1rxzjqg";
     const CLOUDINARY_UPLOAD_PRESET = "cochinita_unsigned";
     const IMAGE_BASE_URL = "./"; // misma carpeta raíz que index.html
+    const ADMIN_EMAIL = "cochinitapibil172@gmail.com"; // única cuenta autorizada a administrar
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -407,11 +408,18 @@
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
 
     auth.onAuthStateChanged(user => {
-        if (user) {
+        if (user && user.email === ADMIN_EMAIL) {
             loginScreen.style.display = 'none';
             appScreen.style.display = 'block';
             document.getElementById('userEmailLabel').textContent = user.email;
             loadProducts();
+        } else if (user) {
+            // Alguien más (p. ej. un cliente registrado en index.html) intentó entrar aquí
+            auth.signOut();
+            loginScreen.style.display = 'flex';
+            appScreen.style.display = 'none';
+            loginError.textContent = 'Esta cuenta no tiene permiso para administrar el sitio.';
+            loginError.style.display = 'block';
         } else {
             loginScreen.style.display = 'flex';
             appScreen.style.display = 'none';
