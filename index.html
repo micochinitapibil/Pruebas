@@ -1754,6 +1754,101 @@
             transform: none;
         }
 
+        .cart-digital-btn {
+            width: 100%;
+            background: linear-gradient(120deg, var(--secondary), var(--primary));
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(201, 162, 39, 0.35);
+            margin-bottom: 10px;
+        }
+
+        .cart-digital-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(201, 162, 39, 0.45);
+        }
+
+        .cart-digital-btn:disabled {
+            background: #ccc;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Rastreador flotante del estado del pedido */
+        .order-tracker {
+            position: fixed;
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            max-width: 420px;
+            margin: 0 auto;
+            background: #241B10;
+            color: white;
+            border-radius: 18px;
+            padding: 14px 18px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.35);
+            z-index: 3500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .order-tracker[hidden] {
+            display: none;
+        }
+
+        .order-tracker-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .order-tracker-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .order-tracker-info .label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .order-tracker-info .status {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .order-tracker-close {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+
         /* ============================================
            LOGIN DE CLIENTES
            ============================================ */
@@ -2533,6 +2628,9 @@
                     <button type="button" id="cartServiceSummaryChange">Cambiar</button>
                 </div>
                 <div class="cart-total-breakdown" id="cartTotal"></div>
+                <button class="cart-digital-btn" id="digitalOrderBtn">
+                    <i class="fas fa-bell-concierge"></i> Finalizar pedido
+                </button>
                 <button class="cart-checkout-btn" id="checkoutBtn">
                     <i class="fab fa-whatsapp"></i> Finalizar por WhatsApp
                 </button>
@@ -2550,6 +2648,16 @@
                 <button class="prep-yes-btn" id="prepYesBtn">Continuar</button>
             </div>
         </div>
+    </div>
+
+    <!-- RASTREADOR FLOTANTE DEL ESTADO DEL PEDIDO -->
+    <div class="order-tracker" id="orderTracker" hidden>
+        <div class="order-tracker-icon" id="orderTrackerIcon">🕐</div>
+        <div class="order-tracker-info">
+            <div class="label">Tu pedido</div>
+            <div class="status" id="orderTrackerStatus">Nuevo</div>
+        </div>
+        <button type="button" class="order-tracker-close" id="orderTrackerClose" aria-label="Cerrar">&times;</button>
     </div>
 
     <!-- MODAL: ADICIONALES ANTES DE FINALIZAR PEDIDO -->
@@ -2939,7 +3047,7 @@
             'Salsa Habanero': 'salsa.jpg',
             'Cebollitas con Habanero': 'cebollitasconabanero.jpg',
             'Cebollitas con Limón y Orégano': 'cebollitassinabanero.jpg',
-            'Frijoles Refritos': 'frijoles.jpg'
+            'Frijoles Refritos': 'FRIJOLES.jpg'
         };
         
         // Mapa dinámico: nombre de producto -> URL de imagen, se llena
@@ -3164,6 +3272,7 @@
         const cartItemsEl = document.getElementById('cartItems');
         const cartTotalEl = document.getElementById('cartTotal');
         const checkoutBtn = document.getElementById('checkoutBtn');
+        const digitalOrderBtn = document.getElementById('digitalOrderBtn');
 
         function parsePrice(priceStr) {
             return parseFloat(priceStr.replace('MX$', '').replace(',', '')) || 0;
@@ -3352,7 +3461,7 @@
             { name: 'Salsa Habanero', price: 25, img: 'salsa.jpg' },
             { name: 'Cebollitas con Habanero (curtidas con naranja agria y orégano)', price: 25, img: 'cebollitasconabanero.jpg' },
             { name: 'Cebollitas con Limón y Orégano', price: 25, img: 'cebollitassinabanero.jpg' },
-            { name: 'Frijoles Refritos', price: 30, img: 'frijoles.jpg' },
+            { name: 'Frijoles Refritos', price: 30, img: 'FRIJOLES.jpg' },
             { name: 'Orden de Tostadas Panucheras (10 piezas)', price: 50, img: 'tostadas-panucheras.jpg' },
             { name: 'Tostadas Panucheras Adicionales (2 piezas)', price: 10, img: 'tostadas-extra.jpg' }
         ];
@@ -3457,17 +3566,108 @@
         addonsSkipBtn.addEventListener('click', () => {
             addonQuantities = {};
             closeAddonsModal();
-            sendWhatsAppOrder();
+            if (pendingCheckoutType === 'digital') sendDigitalOrder(); else sendWhatsAppOrder();
         });
 
         addonsContinueBtn.addEventListener('click', () => {
             closeAddonsModal();
-            sendWhatsAppOrder();
+            if (pendingCheckoutType === 'digital') sendDigitalOrder(); else sendWhatsAppOrder();
         });
+
+        let pendingCheckoutType = 'whatsapp'; // 'whatsapp' | 'digital'
 
         checkoutBtn.addEventListener('click', () => {
             if (cart.length === 0) return;
+            pendingCheckoutType = 'whatsapp';
             openAddonsModal();
+        });
+
+        digitalOrderBtn.addEventListener('click', () => {
+            if (cart.length === 0) return;
+            pendingCheckoutType = 'digital';
+            openAddonsModal();
+        });
+
+        // ============================================
+        // COMANDA DIGITAL (se guarda en Firestore y aparece en comandas.html)
+        // ============================================
+        const orderTracker = document.getElementById('orderTracker');
+        const orderTrackerIcon = document.getElementById('orderTrackerIcon');
+        const orderTrackerStatus = document.getElementById('orderTrackerStatus');
+        const orderTrackerClose = document.getElementById('orderTrackerClose');
+
+        const ORDER_STATUS_INFO = {
+            nuevo: { icon: '🕐', label: 'Nuevo — esperando confirmación' },
+            preparando: { icon: '🔥', label: 'En preparación' },
+            listo: { icon: '✅', label: '¡Listo!' },
+            entregado: { icon: '🐷', label: 'Entregado — ¡buen provecho!' }
+        };
+
+        let orderTrackerUnsub = null;
+
+        async function sendDigitalOrder() {
+            digitalOrderBtn.disabled = true;
+            try {
+                if (!auth.currentUser) {
+                    await auth.signInAnonymously();
+                }
+
+                const addonsChosen = ADDONS.filter(a => (addonQuantities[a.name] || 0) > 0);
+                let addonsTotal = 0;
+                const addonsData = addonsChosen.map(a => {
+                    const qty = addonQuantities[a.name];
+                    addonsTotal += a.price * qty;
+                    return { name: a.name, qty, price: a.price };
+                });
+
+                const fee = getDeliveryFee();
+                const user = auth.currentUser;
+
+                const orderData = {
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'nuevo',
+                    orderType: orderType,
+                    tableNumber: orderType === 'dine_in' ? tableNumber : null,
+                    items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+                    addons: addonsData,
+                    subtotal: getCartSubtotal(),
+                    deliveryFee: fee,
+                    total: getCartTotal() + addonsTotal,
+                    uid: user.uid,
+                    customerEmail: user.isAnonymous ? null : user.email,
+                    customerName: user.isAnonymous ? null : (user.displayName || null)
+                };
+
+                const docRef = await db.collection('comandas').add(orderData);
+
+                addonQuantities = {};
+                cart = [];
+                updateCartBadge();
+                closeCart();
+
+                startOrderTracking(docRef.id);
+            } catch (err) {
+                console.error('Error al enviar la comanda digital:', err);
+                alert('No se pudo enviar tu pedido. Intenta de nuevo o usa el botón de WhatsApp.');
+            } finally {
+                digitalOrderBtn.disabled = false;
+            }
+        }
+
+        function startOrderTracking(orderId) {
+            if (orderTrackerUnsub) orderTrackerUnsub();
+            orderTracker.removeAttribute('hidden');
+            orderTrackerUnsub = db.collection('comandas').doc(orderId).onSnapshot(doc => {
+                if (!doc.exists) return;
+                const status = doc.data().status || 'nuevo';
+                const info = ORDER_STATUS_INFO[status] || ORDER_STATUS_INFO.nuevo;
+                orderTrackerIcon.textContent = info.icon;
+                orderTrackerStatus.textContent = info.label;
+            });
+        }
+
+        orderTrackerClose.addEventListener('click', () => {
+            orderTracker.setAttribute('hidden', '');
         });
     </script>
 </body>
