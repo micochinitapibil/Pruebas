@@ -300,6 +300,14 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     const comandasRef = db.collection('comandas');
+    const clientesRef = db.collection('clientes');
+
+    let LOYALTY_THRESHOLD = 7; // valor de respaldo mientras carga la configuración real
+    db.collection('config').doc('general').onSnapshot(doc => {
+        if (doc.exists && doc.data().loyaltyThreshold) {
+            LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
+        }
+    }, err => console.error('Error leyendo configuración:', err));
 
     // ==================================================
     // LOGIN / LOGOUT (igual que admin.html)
@@ -446,8 +454,35 @@
 
     function advanceStatus(id, nextStatus) {
         comandasRef.doc(id).update({ status: nextStatus })
-            .then(() => showToast('Actualizado a "' + STATUS_LABELS[nextStatus] + '"'))
+            .then(() => {
+                showToast('Actualizado a "' + STATUS_LABELS[nextStatus] + '"');
+                if (nextStatus === 'entregado') {
+                    const order = allOrders.find(o => o.id === id);
+                    if (order && order.countsForLoyalty && order.uid) {
+                        grantLoyaltyCredit(order.uid);
+                    }
+                }
+            })
             .catch(err => showToast('Error: ' + err.message));
+    }
+
+    // Suma 1 pedido entregado a la cuponera del cliente. Cada vez que junta
+    // LOYALTY_THRESHOLD pedidos, se le regala un platillo gratis (se repite).
+    function grantLoyaltyCredit(uid) {
+        const clienteRef = clientesRef.doc(uid);
+        db.runTransaction(async (tx) => {
+            const doc = await tx.get(clienteRef);
+            const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
+            const newCount = (data.ordersCompleted || 0) + 1;
+            const updates = {
+                ordersCompleted: newCount,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            if (newCount % LOYALTY_THRESHOLD === 0) {
+                updates.freeDishesAvailable = (data.freeDishesAvailable || 0) + 1;
+            }
+            tx.set(clienteRef, updates, { merge: true });
+        }).catch(err => console.error('Error actualizando cuponera:', err));
     }
 
     document.getElementById('tabActive').addEventListener('click', () => {

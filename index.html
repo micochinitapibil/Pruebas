@@ -1850,6 +1850,153 @@
         }
 
         /* ============================================
+           CUPONERA (botón flotante + modal)
+           ============================================ */
+        .loyalty-fab {
+            position: fixed;
+            right: 16px;
+            bottom: 96px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-size: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.3);
+            cursor: pointer;
+            z-index: 3400;
+        }
+
+        .loyalty-fab-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--red, #c0392b);
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            border: 2px solid white;
+        }
+
+        .loyalty-fab-badge[hidden] { display: none; }
+
+        .loyalty-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(45, 27, 61, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 5100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .loyalty-modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loyalty-modal {
+            background: white;
+            border-radius: 24px;
+            max-width: 380px;
+            width: 100%;
+            padding: 30px 26px 28px;
+            position: relative;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+            transform: translateY(30px) scale(0.96);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .loyalty-modal-overlay.active .loyalty-modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .loyalty-modal-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: none;
+            background: var(--light);
+            color: var(--dark);
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loyalty-modal-icon { font-size: 44px; margin-bottom: 8px; }
+
+        .loyalty-modal h3 {
+            color: var(--secondary);
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 14px;
+        }
+
+        .loyalty-modal p { color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 10px; }
+
+        .loyalty-rule strong { color: var(--secondary); }
+
+        .loyalty-progress-bar {
+            width: 100%;
+            height: 14px;
+            background: var(--light);
+            border-radius: 7px;
+            overflow: hidden;
+            margin: 16px 0 8px;
+        }
+
+        .loyalty-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 7px;
+            transition: width 0.4s ease;
+        }
+
+        .loyalty-progress-text {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: 6px;
+        }
+
+        .loyalty-free-banner {
+            margin-top: 14px;
+            background: #fff4d6;
+            border: 2px dashed var(--primary);
+            border-radius: 14px;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .loyalty-free-banner[hidden] { display: none; }
+
+        /* ============================================
            LOGIN DE CLIENTES
            ============================================ */
         .auth-overlay {
@@ -2660,6 +2807,39 @@
         <button type="button" class="order-tracker-close" id="orderTrackerClose" aria-label="Cerrar">&times;</button>
     </div>
 
+    <!-- BOTÓN FLOTANTE DE CUPONERA -->
+    <button type="button" class="loyalty-fab" id="loyaltyFab" aria-label="Ver mi cuponera">
+        🎁
+        <span class="loyalty-fab-badge" id="loyaltyFabBadge" hidden>0</span>
+    </button>
+
+    <!-- MODAL: CUPONERA / PROGRAMA DE LEALTAD -->
+    <div class="loyalty-modal-overlay" id="loyaltyModalOverlay">
+        <div class="loyalty-modal">
+            <button class="loyalty-modal-close" id="loyaltyModalClose" aria-label="Cerrar">&times;</button>
+            <div class="loyalty-modal-icon">🎁</div>
+            <h3>Cuponera Cochinita Pibil</h3>
+
+            <!-- Vista para invitados / no logueados -->
+            <div id="loyaltyGuestView">
+                <p>Inicia sesión con tu cuenta (no como invitado) para empezar a acumular tus pedidos.</p>
+                <p class="loyalty-rule" id="loyaltyGuestRule">Cada <strong>7</strong> pedidos entregados, ¡el siguiente platillo va por la casa!</p>
+            </div>
+
+            <!-- Vista para clientes logueados -->
+            <div id="loyaltyUserView" hidden>
+                <p class="loyalty-rule" id="loyaltyUserRule">Cada <strong>7</strong> pedidos entregados ganas un platillo totalmente gratis.</p>
+                <div class="loyalty-progress-bar">
+                    <div class="loyalty-progress-fill" id="loyaltyProgressFill" style="width:0%;"></div>
+                </div>
+                <div class="loyalty-progress-text" id="loyaltyProgressText">0 de 7 pedidos</div>
+                <div class="loyalty-free-banner" id="loyaltyFreeBanner" hidden>
+                    🎉 ¡Tienes <span id="loyaltyFreeCount">0</span> platillo(s) gratis! Menciónalo al hacer tu próximo pedido.
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ADICIONALES ANTES DE FINALIZAR PEDIDO -->
     <div class="addons-overlay" id="addonsOverlay">
         <div class="addons-modal">
@@ -2690,6 +2870,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
+        const configRef = db.collection('config').doc('general');
 
         // ============================================
         // LOGIN DE CLIENTES
@@ -2746,7 +2927,7 @@
         });
 
         function updateUserUI(user) {
-            if (user) {
+            if (user && !user.isAnonymous) {
                 userBtnLabel.textContent = (user.displayName || user.email).split(' ')[0].split('@')[0];
                 userDropdownEmail.textContent = user.email;
                 userLogoutBtn.style.display = 'flex';
@@ -2778,23 +2959,33 @@
         });
 
         auth.onAuthStateChanged(user => {
-            if (user) {
+            if (user && !user.isAnonymous) {
                 isGuest = false;
                 authOverlay.setAttribute('hidden', '');
                 updateUserUI(user);
                 proceedToOrderType();
+                startLoyaltyTracking(user.uid);
+            } else if (user && user.isAnonymous) {
+                // Invitado que ya había hecho un pedido digital antes: lo dejamos pasar directo
+                isGuest = true;
+                authOverlay.setAttribute('hidden', '');
+                updateUserUI(null);
+                proceedToOrderType();
+                showLoyaltyGuestView();
             } else if (isGuest) {
                 updateUserUI(null);
+                showLoyaltyGuestView();
             } else {
                 authOverlay.removeAttribute('hidden');
                 updateUserUI(null);
+                showLoyaltyGuestView();
             }
         });
 
         // ============================================
         // TIPO DE PEDIDO (domicilio / recoger / comer aquí)
         // ============================================
-        const TABLE_COUNT = 10; // ← cambia este número según cuántas mesas tenga el local
+        let TABLE_COUNT = 10; // valor de respaldo mientras carga la configuración real
 
         let orderType = null;       // 'delivery' | 'pickup' | 'dine_in'
         let tableNumber = null;     // solo si orderType === 'dine_in'
@@ -2812,17 +3003,38 @@
         const cartServiceSummaryText = document.getElementById('cartServiceSummaryText');
         const cartServiceSummaryChange = document.getElementById('cartServiceSummaryChange');
 
-        // Genera los botones de mesa (1 a TABLE_COUNT)
-        for (let i = 1; i <= TABLE_COUNT; i++) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = i;
-            btn.addEventListener('click', () => {
-                tableNumber = i;
-                finishOrderTypeSelection('dine_in');
-            });
-            tableGrid.appendChild(btn);
+        // Genera los botones de mesa (1 a TABLE_COUNT). Se puede volver a llamar
+        // si la configuración real llega después de la primera pintada.
+        function renderTableGrid(count) {
+            TABLE_COUNT = count;
+            tableGrid.innerHTML = '';
+            for (let i = 1; i <= TABLE_COUNT; i++) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = i;
+                btn.addEventListener('click', () => {
+                    tableNumber = i;
+                    finishOrderTypeSelection('dine_in');
+                });
+                tableGrid.appendChild(btn);
+            }
         }
+        renderTableGrid(TABLE_COUNT);
+
+        let LOYALTY_THRESHOLD = 7; // valor de respaldo mientras carga la configuración real
+
+        // Escucha la config del negocio en tiempo real (mesas y umbral de cuponera),
+        // así si el admin la cambia no hace falta ni recargar la página.
+        configRef.onSnapshot(doc => {
+            const data = doc.exists ? doc.data() : {};
+            if (data.tableCount && data.tableCount !== TABLE_COUNT) {
+                renderTableGrid(data.tableCount);
+            }
+            if (data.loyaltyThreshold) {
+                LOYALTY_THRESHOLD = data.loyaltyThreshold;
+                updateLoyaltyThresholdUI();
+            }
+        }, err => console.error('Error leyendo configuración:', err));
 
         function proceedToOrderType() {
             if (orderTypeAsked) return;
@@ -3635,7 +3847,8 @@
                     total: getCartTotal() + addonsTotal,
                     uid: user.uid,
                     customerEmail: user.isAnonymous ? null : user.email,
-                    customerName: user.isAnonymous ? null : (user.displayName || null)
+                    customerName: user.isAnonymous ? null : (user.displayName || null),
+                    countsForLoyalty: !user.isAnonymous
                 };
 
                 const docRef = await db.collection('comandas').add(orderData);
@@ -3668,6 +3881,68 @@
 
         orderTrackerClose.addEventListener('click', () => {
             orderTracker.setAttribute('hidden', '');
+        });
+
+        // ============================================
+        // CUPONERA / PROGRAMA DE LEALTAD
+        // ============================================
+        const loyaltyFab = document.getElementById('loyaltyFab');
+        const loyaltyFabBadge = document.getElementById('loyaltyFabBadge');
+        const loyaltyModalOverlay = document.getElementById('loyaltyModalOverlay');
+        const loyaltyModalClose = document.getElementById('loyaltyModalClose');
+        const loyaltyGuestView = document.getElementById('loyaltyGuestView');
+        const loyaltyUserView = document.getElementById('loyaltyUserView');
+        const loyaltyGuestRule = document.getElementById('loyaltyGuestRule');
+        const loyaltyUserRule = document.getElementById('loyaltyUserRule');
+        const loyaltyProgressFill = document.getElementById('loyaltyProgressFill');
+        const loyaltyProgressText = document.getElementById('loyaltyProgressText');
+        const loyaltyFreeBanner = document.getElementById('loyaltyFreeBanner');
+        const loyaltyFreeCount = document.getElementById('loyaltyFreeCount');
+
+        let clienteUnsub = null;
+
+        function updateLoyaltyThresholdUI() {
+            loyaltyGuestRule.innerHTML = `Cada <strong>${LOYALTY_THRESHOLD}</strong> pedidos entregados, ¡el siguiente platillo va por la casa!`;
+            loyaltyUserRule.innerHTML = `Cada <strong>${LOYALTY_THRESHOLD}</strong> pedidos entregados ganas un platillo totalmente gratis.`;
+        }
+
+        function showLoyaltyGuestView() {
+            if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
+            loyaltyGuestView.hidden = false;
+            loyaltyUserView.hidden = true;
+            loyaltyFabBadge.hidden = true;
+        }
+
+        function startLoyaltyTracking(uid) {
+            if (clienteUnsub) clienteUnsub();
+            loyaltyGuestView.hidden = true;
+            loyaltyUserView.hidden = false;
+            clienteUnsub = db.collection('clientes').doc(uid).onSnapshot(doc => {
+                const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
+                const completed = data.ordersCompleted || 0;
+                const free = data.freeDishesAvailable || 0;
+                const progressInCycle = completed % LOYALTY_THRESHOLD;
+                const pct = Math.round((progressInCycle / LOYALTY_THRESHOLD) * 100);
+
+                loyaltyProgressFill.style.width = pct + '%';
+                loyaltyProgressText.textContent = `${progressInCycle} de ${LOYALTY_THRESHOLD} pedidos`;
+
+                if (free > 0) {
+                    loyaltyFreeBanner.hidden = false;
+                    loyaltyFreeCount.textContent = free;
+                    loyaltyFabBadge.hidden = false;
+                    loyaltyFabBadge.textContent = free;
+                } else {
+                    loyaltyFreeBanner.hidden = true;
+                    loyaltyFabBadge.hidden = true;
+                }
+            }, err => console.error('Error leyendo cuponera:', err));
+        }
+
+        loyaltyFab.addEventListener('click', () => loyaltyModalOverlay.classList.add('active'));
+        loyaltyModalClose.addEventListener('click', () => loyaltyModalOverlay.classList.remove('active'));
+        loyaltyModalOverlay.addEventListener('click', (e) => {
+            if (e.target === loyaltyModalOverlay) loyaltyModalOverlay.classList.remove('active');
         });
     </script>
 </body>

@@ -293,6 +293,25 @@
 
     <div style="padding: 20px; max-width: 800px; margin: 0 auto;">
 
+        <!-- Configuración del negocio -->
+        <div class="card">
+            <h3>⚙️ Configuración del negocio</h3>
+            <div class="row2">
+                <div class="field">
+                    <label>Número de mesas</label>
+                    <input type="number" id="cfg_tableCount" min="1" step="1">
+                </div>
+                <div class="field">
+                    <label>Pedidos para cupón gratis 🎁</label>
+                    <input type="number" id="cfg_loyaltyThreshold" min="1" step="1">
+                </div>
+            </div>
+            <p style="font-size:12px; color:#888; margin-bottom:12px;">
+                Cada vez que un cliente logueado (no invitado) llegue a este número de pedidos entregados, gana un platillo gratis. Se repite cada vez que vuelve a juntar esa cantidad.
+            </p>
+            <button class="btn btn-green" id="saveConfigBtn" style="width:100%;">Guardar configuración</button>
+        </div>
+
         <!-- Migración inicial -->
         <div class="card" id="migrateBox" style="display:none;">
             <h3>📦 Migrar menú original</h3>
@@ -400,6 +419,7 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     const productosRef = db.collection('productos');
+    const configRef = db.collection('config').doc('general');
 
     // ==================================================
     // LOGIN / LOGOUT
@@ -427,6 +447,7 @@
             appScreen.style.display = 'block';
             document.getElementById('userEmailLabel').textContent = user.email;
             loadProducts();
+            loadConfig();
         } else if (user) {
             // Alguien más (p. ej. un cliente registrado en index.html) intentó entrar aquí
             auth.signOut();
@@ -449,6 +470,32 @@
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 2200);
     }
+
+    // ==================================================
+    // CONFIGURACIÓN DEL NEGOCIO (mesas, umbral de cuponera)
+    // ==================================================
+    function loadConfig() {
+        configRef.get().then(doc => {
+            const data = doc.exists ? doc.data() : {};
+            document.getElementById('cfg_tableCount').value = data.tableCount || 10;
+            document.getElementById('cfg_loyaltyThreshold').value = data.loyaltyThreshold || 7;
+        }).catch(err => {
+            console.error(err);
+            showToast('Error leyendo configuración: ' + err.message);
+        });
+    }
+
+    document.getElementById('saveConfigBtn').addEventListener('click', () => {
+        const tableCount = parseInt(document.getElementById('cfg_tableCount').value, 10);
+        const loyaltyThreshold = parseInt(document.getElementById('cfg_loyaltyThreshold').value, 10);
+        if (!tableCount || tableCount < 1 || !loyaltyThreshold || loyaltyThreshold < 1) {
+            showToast('Revisa los valores: deben ser números mayores a 0');
+            return;
+        }
+        configRef.set({ tableCount, loyaltyThreshold }, { merge: true })
+            .then(() => showToast('Configuración guardada'))
+            .catch(err => showToast('Error: ' + err.message));
+    });
 
     // ==================================================
     // CARGA Y RENDER DE PRODUCTOS
