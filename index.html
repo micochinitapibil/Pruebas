@@ -3628,7 +3628,7 @@
                     status: 'nuevo',
                     orderType: orderType,
                     tableNumber: orderType === 'dine_in' ? tableNumber : null,
-                    items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+                    items: cart.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) })),
                     addons: addonsData,
                     subtotal: getCartSubtotal(),
                     deliveryFee: fee,

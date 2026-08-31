@@ -350,7 +350,8 @@
     }
 
     function formatMoney(n) {
-        return 'MX$' + (n || 0).toFixed(2);
+        const num = typeof n === 'string' ? parseFloat(n.replace(/[^0-9.]/g, '')) : n;
+        return 'MX$' + (num || 0).toFixed(2);
     }
 
     function formatTime(ts) {
