@@ -1668,54 +1668,37 @@
             border-top: 1px solid #f0f0f0;
         }
 
-        .delivery-option {
+        .cart-service-summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8f4e9;
+            border-radius: 12px;
+            padding: 10px 14px;
             margin-bottom: 16px;
-        }
-
-        .delivery-label {
             font-size: 13px;
             font-weight: 700;
             color: var(--dark);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-            text-align: center;
         }
 
-        .delivery-toggle {
-            display: flex;
-            gap: 8px;
+        .cart-service-summary i {
+            color: var(--primary);
+            font-size: 15px;
         }
 
-        .delivery-btn {
+        .cart-service-summary span {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            padding: 10px 6px;
-            border: 2px solid #e5ddc8;
-            background: #fff;
-            color: var(--text);
-            border-radius: 12px;
-            font-size: 12px;
+        }
+
+        .cart-service-summary button {
+            background: transparent;
+            border: none;
+            color: var(--secondary);
             font-weight: 700;
+            font-size: 12px;
             cursor: pointer;
-            transition: all 0.25s ease;
-            text-align: center;
-            line-height: 1.3;
-        }
-
-        .delivery-btn i {
-            font-size: 16px;
-        }
-
-        .delivery-btn.active {
-            border-color: var(--primary);
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            box-shadow: 0 6px 16px rgba(156, 122, 60, 0.3);
+            text-decoration: underline;
+            font-family: inherit;
         }
 
         .cart-total-breakdown {
@@ -1770,12 +1753,484 @@
             cursor: not-allowed;
             transform: none;
         }
+
+        /* ============================================
+           LOGIN DE CLIENTES
+           ============================================ */
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #241B10 0%, #5c3d10 60%, #8A6116 100%);
+            z-index: 5000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-overlay[hidden] {
+            display: none;
+        }
+
+        .auth-card {
+            background: #FBF0D6;
+            border-radius: 24px;
+            max-width: 380px;
+            width: 100%;
+            max-height: 92vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+            padding: 32px 28px;
+            text-align: center;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .auth-card img {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 8px;
+        }
+
+        .auth-card h2 {
+            font-size: 22px;
+            color: var(--accent);
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .auth-card .auth-subtitle {
+            font-size: 14px;
+            color: #6b5a3e;
+            margin-bottom: 22px;
+        }
+
+        .auth-error {
+            display: none;
+            background: #fdecea;
+            color: #c0392b;
+            font-size: 13px;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            text-align: left;
+        }
+
+        .google-btn {
+            width: 100%;
+            background: white;
+            color: #3c4043;
+            border: 2px solid rgba(138, 97, 22, 0.25);
+            padding: 12px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: all 0.25s ease;
+        }
+
+        .google-btn:hover {
+            background: #f8f4e9;
+            border-color: var(--primary);
+        }
+
+        .google-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0 16px;
+            color: #a3906a;
+            font-size: 12px;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(138, 97, 22, 0.25);
+        }
+
+        .auth-guest-btn {
+            width: 100%;
+            background: transparent;
+            border: 2px solid var(--secondary);
+            color: var(--secondary);
+            padding: 12px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .auth-guest-btn:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        /* Indicador de cuenta en el header */
+        .user-menu {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .user-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            height: 42px;
+            padding: 0 14px 0 12px;
+            border-radius: 21px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+            font-family: inherit;
+            max-width: 140px;
+        }
+
+        .user-btn:hover {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .user-btn span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+            padding: 8px;
+            min-width: 190px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.25s ease;
+            z-index: 1001;
+            text-align: left;
+        }
+
+        .user-dropdown.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .user-dropdown .user-dropdown-email {
+            font-size: 12px;
+            color: #8a7554;
+            padding: 8px 10px 4px;
+            word-break: break-all;
+        }
+
+        .user-dropdown button {
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-dropdown button:hover {
+            background: rgba(138, 97, 22, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .user-btn {
+                width: 36px;
+                height: 36px;
+                padding: 0;
+                justify-content: center;
+                border-radius: 50%;
+            }
+            .user-btn span {
+                display: none;
+            }
+            .user-dropdown {
+                right: -8px;
+            }
+        }
+
+        /* ============================================
+           TIPO DE PEDIDO (domicilio / recoger / comer aquí)
+           ============================================ */
+        .order-type-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #241B10 0%, #5c3d10 60%, #8A6116 100%);
+            z-index: 4500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .order-type-overlay[hidden] {
+            display: none;
+        }
+
+        .order-type-card {
+            background: #FBF0D6;
+            border-radius: 24px;
+            max-width: 420px;
+            width: 100%;
+            max-height: 92vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+            padding: 32px 26px;
+            text-align: center;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .order-type-card h2 {
+            font-size: 21px;
+            color: var(--accent);
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .order-type-subtitle {
+            font-size: 14px;
+            color: #6b5a3e;
+            margin-bottom: 20px;
+        }
+
+        .order-type-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .order-type-btn {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+            background: white;
+            border: 2px solid rgba(138, 97, 22, 0.2);
+            border-radius: 14px;
+            padding: 16px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+
+        .order-type-btn:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(201, 162, 39, 0.25);
+        }
+
+        .order-type-btn i {
+            font-size: 22px;
+            color: var(--primary);
+            width: 30px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .order-type-btn span {
+            display: block;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .order-type-btn small {
+            display: block;
+            font-size: 12px;
+            color: #8a7554;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        .table-select[hidden] {
+            display: none;
+        }
+
+        .table-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .table-grid button {
+            aspect-ratio: 1;
+            border: 2px solid rgba(138, 97, 22, 0.25);
+            background: white;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--dark);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .table-grid button:hover {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .table-back-btn {
+            background: transparent;
+            border: none;
+            color: var(--secondary);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Barra de servicio (debajo del header) */
+        .service-bar {
+            background: #f8f4e9;
+            border-bottom: 1px solid rgba(138, 97, 22, 0.15);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .service-bar[hidden] {
+            display: none;
+        }
+
+        .service-bar-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .service-bar-info i {
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .service-bar-change {
+            background: transparent;
+            border: none;
+            color: var(--secondary);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        @media (max-width: 480px) {
+            .table-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
     </style>
     <!-- Firebase (CDN, compat SDK - vanilla JS, sin npm) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
+    <!-- LOGIN DE CLIENTES -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+            <img src="./logo.png" alt="Mi Cochinita Pibil">
+            <h2>Mi Cochinita Pibil</h2>
+            <div class="auth-subtitle">Inicia sesión para continuar</div>
+
+            <div class="auth-error" id="authError"></div>
+
+            <button type="button" class="google-btn" id="googleSignInBtn">
+                <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                </svg>
+                Continuar con Google
+            </button>
+
+            <div class="auth-divider">o</div>
+
+            <button type="button" class="auth-guest-btn" id="authGuestBtn">Continuar como invitado</button>
+        </div>
+    </div>
+
+    <!-- TIPO DE PEDIDO (domicilio / recoger / comer aquí) -->
+    <div class="order-type-overlay" id="orderTypeOverlay" hidden>
+        <div class="order-type-card">
+            <h2>¿Cómo quieres tu pedido?</h2>
+            <div class="order-type-subtitle">Elige una opción para continuar</div>
+
+            <div class="order-type-options" id="orderTypeOptions">
+                <button type="button" class="order-type-btn" data-type="delivery">
+                    <i class="fas fa-motorcycle"></i>
+                    <span>A domicilio</span>
+                    <small>+MX$15.00 de envío</small>
+                </button>
+                <button type="button" class="order-type-btn" data-type="pickup">
+                    <i class="fas fa-store"></i>
+                    <span>Recoger en el local</span>
+                    <small>Sin costo extra</small>
+                </button>
+                <button type="button" class="order-type-btn" data-type="dine_in">
+                    <i class="fas fa-utensils"></i>
+                    <span>Comer aquí</span>
+                    <small>Elige tu mesa</small>
+                </button>
+            </div>
+
+            <div class="table-select" id="tableSelect" hidden>
+                <div class="order-type-subtitle">¿En qué mesa estás?</div>
+                <div class="table-grid" id="tableGrid"><!-- generado por JS --></div>
+                <button type="button" class="table-back-btn" id="tableBackBtn">
+                    <i class="fas fa-arrow-left"></i> Regresar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- HEADER -->
     <header>
         <div class="container">
@@ -1792,6 +2247,16 @@
                     <a href="#contacto">Ubicación</a>
                 </nav>
                 <div class="header-actions">
+                    <div class="user-menu">
+                        <button class="user-btn" id="userBtn" aria-label="Mi cuenta">
+                            <i class="fas fa-user"></i>
+                            <span id="userBtnLabel">Invitado</span>
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            <div class="user-dropdown-email" id="userDropdownEmail"></div>
+                            <button type="button" id="userLogoutBtn"><i class="fas fa-right-from-bracket"></i> Cerrar sesión</button>
+                        </div>
+                    </div>
                     <button class="cart-btn" id="cartBtn" aria-label="Ver carrito">
                         <i class="fas fa-shopping-cart"></i>
                         <span class="cart-badge" id="cartBadge">0</span>
@@ -1805,6 +2270,17 @@
             </div>
         </div>
     </header>
+
+    <!-- BARRA DE SERVICIO (elección actual, se puede cambiar en cualquier momento) -->
+    <div class="service-bar" id="serviceBar" hidden>
+        <div class="service-bar-info">
+            <i class="fas fa-motorcycle" id="serviceBarIcon"></i>
+            <span id="serviceBarText">A domicilio</span>
+        </div>
+        <button type="button" class="service-bar-change" id="serviceBarChange">
+            Cambiar <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
 
     <!-- HERO -->
     <section class="hero" id="inicio">
@@ -2051,16 +2527,10 @@
                 <!-- generado por JS -->
             </div>
             <div class="cart-footer">
-                <div class="delivery-option">
-                    <p class="delivery-label">¿Cómo quieres tu pedido?</p>
-                    <div class="delivery-toggle">
-                        <button type="button" class="delivery-btn active" id="pickupBtn" data-type="pickup">
-                            <i class="fas fa-store"></i> Recoger en el local
-                        </button>
-                        <button type="button" class="delivery-btn" id="deliveryBtn" data-type="delivery">
-                            <i class="fas fa-motorcycle"></i> A domicilio (+MX$15.00)
-                        </button>
-                    </div>
+                <div class="cart-service-summary" id="cartServiceSummary">
+                    <i class="fas fa-motorcycle"></i>
+                    <span id="cartServiceSummaryText">A domicilio</span>
+                    <button type="button" id="cartServiceSummaryChange">Cambiar</button>
                 </div>
                 <div class="cart-total-breakdown" id="cartTotal"></div>
                 <button class="cart-checkout-btn" id="checkoutBtn">
@@ -2111,6 +2581,196 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // ============================================
+        // LOGIN DE CLIENTES
+        // ============================================
+        let isGuest = false;
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+        const authOverlay = document.getElementById('authOverlay');
+        const authError = document.getElementById('authError');
+        const googleSignInBtn = document.getElementById('googleSignInBtn');
+        const authGuestBtn = document.getElementById('authGuestBtn');
+
+        const userBtn = document.getElementById('userBtn');
+        const userBtnLabel = document.getElementById('userBtnLabel');
+        const userDropdown = document.getElementById('userDropdown');
+        const userDropdownEmail = document.getElementById('userDropdownEmail');
+        const userLogoutBtn = document.getElementById('userLogoutBtn');
+
+        function showAuthError(message) {
+            authError.textContent = message;
+            authError.style.display = 'block';
+        }
+
+        function friendlyAuthError(err) {
+            switch (err.code) {
+                case 'auth/popup-closed-by-user':
+                case 'auth/cancelled-popup-request':
+                    return ''; // el cliente cerró la ventana, no es un error real
+                case 'auth/popup-blocked':
+                    return 'Tu navegador bloqueó la ventana de Google. Permite las ventanas emergentes e intenta de nuevo.';
+                case 'auth/network-request-failed':
+                    return 'Falló la conexión. Revisa tu internet e intenta de nuevo.';
+                default:
+                    return 'No se pudo iniciar sesión con Google. Intenta de nuevo.';
+            }
+        }
+
+        googleSignInBtn.addEventListener('click', () => {
+            authError.style.display = 'none';
+            googleSignInBtn.disabled = true;
+            auth.signInWithPopup(googleProvider)
+                .catch(err => {
+                    const message = friendlyAuthError(err);
+                    if (message) showAuthError(message);
+                })
+                .finally(() => { googleSignInBtn.disabled = false; });
+        });
+
+        authGuestBtn.addEventListener('click', () => {
+            isGuest = true;
+            authOverlay.setAttribute('hidden', '');
+            updateUserUI(null);
+            proceedToOrderType();
+        });
+
+        function updateUserUI(user) {
+            if (user) {
+                userBtnLabel.textContent = (user.displayName || user.email).split(' ')[0].split('@')[0];
+                userDropdownEmail.textContent = user.email;
+                userLogoutBtn.style.display = 'flex';
+            } else {
+                userBtnLabel.textContent = 'Invitado';
+                userDropdownEmail.textContent = 'Sesión de invitado';
+                userLogoutBtn.style.display = isGuest ? 'flex' : 'none';
+            }
+        }
+
+        userBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userDropdown.classList.toggle('active');
+        });
+
+        document.addEventListener('click', () => {
+            userDropdown.classList.remove('active');
+        });
+
+        userLogoutBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (auth.currentUser) {
+                auth.signOut();
+            } else {
+                // Era invitado: solo recargamos para volver a mostrar el login
+                isGuest = false;
+                window.location.reload();
+            }
+        });
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                isGuest = false;
+                authOverlay.setAttribute('hidden', '');
+                updateUserUI(user);
+                proceedToOrderType();
+            } else if (isGuest) {
+                updateUserUI(null);
+            } else {
+                authOverlay.removeAttribute('hidden');
+                updateUserUI(null);
+            }
+        });
+
+        // ============================================
+        // TIPO DE PEDIDO (domicilio / recoger / comer aquí)
+        // ============================================
+        const TABLE_COUNT = 10; // ← cambia este número según cuántas mesas tenga el local
+
+        let orderType = null;       // 'delivery' | 'pickup' | 'dine_in'
+        let tableNumber = null;     // solo si orderType === 'dine_in'
+        let orderTypeAsked = false; // para no mostrarla más de una vez por carga de página
+
+        const orderTypeOverlay = document.getElementById('orderTypeOverlay');
+        const orderTypeOptions = document.getElementById('orderTypeOptions');
+        const tableSelect = document.getElementById('tableSelect');
+        const tableGrid = document.getElementById('tableGrid');
+        const tableBackBtn = document.getElementById('tableBackBtn');
+        const serviceBar = document.getElementById('serviceBar');
+        const serviceBarIcon = document.getElementById('serviceBarIcon');
+        const serviceBarText = document.getElementById('serviceBarText');
+        const serviceBarChange = document.getElementById('serviceBarChange');
+        const cartServiceSummaryText = document.getElementById('cartServiceSummaryText');
+        const cartServiceSummaryChange = document.getElementById('cartServiceSummaryChange');
+
+        // Genera los botones de mesa (1 a TABLE_COUNT)
+        for (let i = 1; i <= TABLE_COUNT; i++) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = i;
+            btn.addEventListener('click', () => {
+                tableNumber = i;
+                finishOrderTypeSelection('dine_in');
+            });
+            tableGrid.appendChild(btn);
+        }
+
+        function proceedToOrderType() {
+            if (orderTypeAsked) return;
+            orderTypeAsked = true;
+            orderTypeOptions.hidden = false;
+            tableSelect.hidden = true;
+            orderTypeOverlay.removeAttribute('hidden');
+        }
+
+        function reopenOrderType() {
+            orderTypeOptions.hidden = false;
+            tableSelect.hidden = true;
+            orderTypeOverlay.removeAttribute('hidden');
+        }
+
+        document.querySelectorAll('.order-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.type;
+                if (type === 'dine_in') {
+                    orderTypeOptions.hidden = true;
+                    tableSelect.hidden = false;
+                } else {
+                    finishOrderTypeSelection(type);
+                }
+            });
+        });
+
+        tableBackBtn.addEventListener('click', () => {
+            orderTypeOptions.hidden = false;
+            tableSelect.hidden = true;
+        });
+
+        function finishOrderTypeSelection(type) {
+            orderType = type;
+            orderTypeOverlay.setAttribute('hidden', '');
+            updateServiceUI();
+            if (typeof renderCart === 'function') renderCart();
+        }
+
+        function orderTypeLabel() {
+            if (orderType === 'delivery') return { icon: 'fa-motorcycle', text: 'A domicilio' };
+            if (orderType === 'dine_in') return { icon: 'fa-utensils', text: `Comer aquí — Mesa ${tableNumber}` };
+            return { icon: 'fa-store', text: 'Recoger en el local' };
+        }
+
+        function updateServiceUI() {
+            const { icon, text } = orderTypeLabel();
+            serviceBar.removeAttribute('hidden');
+            serviceBarIcon.className = 'fas ' + icon;
+            serviceBarText.textContent = text;
+            cartServiceSummaryText.textContent = text;
+            document.getElementById('cartServiceSummary').querySelector('i').className = 'fas ' + icon;
+        }
+
+        serviceBarChange.addEventListener('click', reopenOrderType);
+        cartServiceSummaryChange.addEventListener('click', reopenOrderType);
 
         // ============================================
         // AJUSTAR ALTURA REAL DEL HEADER (para el sticky del menú)
@@ -2487,7 +3147,6 @@
         const DELIVERY_FEE = 15;
 
         let cart = []; // [{ name, price, qty }] — registro momentáneo (no persiste al recargar)
-        let deliveryType = 'pickup'; // 'pickup' | 'delivery'
         let currentModalItem = null;
 
         const productModalOverlay = document.getElementById('productModalOverlay');
@@ -2505,8 +3164,6 @@
         const cartItemsEl = document.getElementById('cartItems');
         const cartTotalEl = document.getElementById('cartTotal');
         const checkoutBtn = document.getElementById('checkoutBtn');
-        const pickupBtn = document.getElementById('pickupBtn');
-        const deliveryBtn = document.getElementById('deliveryBtn');
 
         function parsePrice(priceStr) {
             return parseFloat(priceStr.replace('MX$', '').replace(',', '')) || 0;
@@ -2620,22 +3277,12 @@
         }
 
         function getDeliveryFee() {
-            return deliveryType === 'delivery' ? DELIVERY_FEE : 0;
+            return orderType === 'delivery' ? DELIVERY_FEE : 0;
         }
 
         function getCartTotal() {
             return getCartSubtotal() + getDeliveryFee();
         }
-
-        function setDeliveryType(type) {
-            deliveryType = type;
-            pickupBtn.classList.toggle('active', type === 'pickup');
-            deliveryBtn.classList.toggle('active', type === 'delivery');
-            renderCart();
-        }
-
-        pickupBtn.addEventListener('click', () => setDeliveryType('pickup'));
-        deliveryBtn.addEventListener('click', () => setDeliveryType('delivery'));
 
         function updateCartBadge() {
             const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
@@ -2784,9 +3431,13 @@
             }
 
             const fee = getDeliveryFee();
-            message += deliveryType === 'delivery'
-                ? '\n🛵 Servicio: A domicilio'
-                : '\n🏠 Servicio: Recoger en el local';
+            if (orderType === 'delivery') {
+                message += '\n🛵 Servicio: A domicilio';
+            } else if (orderType === 'dine_in') {
+                message += `\n🍽️ Servicio: Comer aquí — Mesa ${tableNumber}`;
+            } else {
+                message += '\n🏠 Servicio: Recoger en el local';
+            }
 
             if (fee > 0 || addonsTotal > 0) {
                 message += `\nSubtotal: ${formatPrice(getCartSubtotal())}`;
@@ -2795,7 +3446,7 @@
             }
             message += `\nTotal: ${formatPrice(getCartTotal() + addonsTotal)}`;
 
-            if (deliveryType === 'delivery') {
+            if (orderType === 'delivery') {
                 message += '\n\nMi dirección es: ';
             }
 
