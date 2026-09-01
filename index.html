@@ -1788,65 +1788,110 @@
         }
 
         /* Rastreador flotante del estado del pedido */
-        .order-tracker {
+        /* ============================================
+           MI PEDIDO (botón flotante + modal con estatus)
+           ============================================ */
+        .order-fab {
             position: fixed;
-            left: 16px;
             right: 16px;
-            bottom: 16px;
-            max-width: 420px;
-            margin: 0 auto;
-            background: #241B10;
-            color: white;
-            border-radius: 18px;
-            padding: 14px 18px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.35);
-            z-index: 3500;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .order-tracker[hidden] {
-            display: none;
-        }
-
-        .order-tracker-icon {
-            width: 42px;
-            height: 42px;
+            bottom: 164px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.12);
+            border: none;
+            background: linear-gradient(135deg, #3a2c1a, #241B10);
+            color: white;
+            font-size: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-
-        .order-tracker-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .order-tracker-info .label {
-            font-size: 11px;
-            color: rgba(255,255,255,0.6);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .order-tracker-info .status {
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        .order-tracker-close {
-            background: transparent;
-            border: none;
-            color: rgba(255,255,255,0.6);
-            font-size: 20px;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.3);
             cursor: pointer;
-            padding: 4px;
-            flex-shrink: 0;
+            z-index: 3400;
+        }
+
+        .order-fab[hidden] { display: none; }
+
+        .order-fab-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #2ecc71;
+            border: 2px solid white;
+            animation: orderFabPulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes orderFabPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.65; }
+        }
+
+        .order-modal-service {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 4px !important;
+        }
+
+        .order-steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 22px 0 14px;
+        }
+
+        .order-step {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .order-step .dot {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+            font-weight: 800;
+        }
+
+        .order-step .label {
+            font-size: 10.5px;
+            color: #999;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .order-step.done .dot { background: var(--primary); border-color: var(--primary); }
+        .order-step.done .dot::after { content: '✓'; }
+
+        .order-step.current .dot {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 5px rgba(0,0,0,0.08);
+        }
+
+        .order-step.done .label,
+        .order-step.current .label { color: var(--secondary); }
+
+        .order-modal-status {
+            font-size: 15px !important;
+            font-weight: 800 !important;
+            color: var(--secondary) !important;
+        }
+
+        .order-modal-total {
+            font-size: 13px !important;
+            color: #888 !important;
         }
 
         /* ============================================
@@ -2797,14 +2842,30 @@
         </div>
     </div>
 
-    <!-- RASTREADOR FLOTANTE DEL ESTADO DEL PEDIDO -->
-    <div class="order-tracker" id="orderTracker" hidden>
-        <div class="order-tracker-icon" id="orderTrackerIcon">🕐</div>
-        <div class="order-tracker-info">
-            <div class="label">Tu pedido</div>
-            <div class="status" id="orderTrackerStatus">Nuevo</div>
+    <!-- BOTÓN FLOTANTE: MI PEDIDO (arriba del botón de cuponera) -->
+    <button type="button" class="order-fab" id="orderFab" aria-label="Ver mi pedido" hidden>
+        📋
+        <span class="order-fab-badge" id="orderFabBadge"></span>
+    </button>
+
+    <!-- MODAL: ESTATUS DE MI PEDIDO -->
+    <div class="loyalty-modal-overlay" id="orderModalOverlay">
+        <div class="loyalty-modal">
+            <button class="loyalty-modal-close" id="orderModalClose" aria-label="Cerrar">&times;</button>
+            <div class="loyalty-modal-icon" id="orderModalIcon">🕐</div>
+            <h3>Tu pedido</h3>
+            <p class="order-modal-service" id="orderModalService"></p>
+
+            <div class="order-steps" id="orderSteps">
+                <div class="order-step" data-step="nuevo"><span class="dot"></span><span class="label">Nuevo</span></div>
+                <div class="order-step" data-step="preparando"><span class="dot"></span><span class="label">Preparando</span></div>
+                <div class="order-step" data-step="listo"><span class="dot"></span><span class="label">Listo</span></div>
+                <div class="order-step" data-step="entregado"><span class="dot"></span><span class="label">Entregado</span></div>
+            </div>
+
+            <p class="order-modal-status" id="orderModalStatusText">Nuevo — esperando confirmación</p>
+            <p class="order-modal-total" id="orderModalTotal"></p>
         </div>
-        <button type="button" class="order-tracker-close" id="orderTrackerClose" aria-label="Cerrar">&times;</button>
     </div>
 
     <!-- BOTÓN FLOTANTE DE CUPONERA -->
@@ -2968,6 +3029,7 @@
                 updateUserUI(user);
                 proceedToOrderType();
                 startLoyaltyTracking(user.uid);
+                watchMyOrders(user.uid);
             } else if (user && user.isAnonymous) {
                 // Invitado que ya había hecho un pedido digital antes: lo dejamos pasar directo
                 if (lastSessionKey !== undefined && lastSessionKey !== 'anon:' + user.uid) resetSessionState();
@@ -2977,6 +3039,7 @@
                 updateUserUI(null);
                 proceedToOrderType();
                 showLoyaltyGuestView();
+                watchMyOrders(user.uid);
             } else if (isGuest) {
                 updateUserUI(null);
                 showLoyaltyGuestView();
@@ -3810,19 +3873,17 @@
         // ============================================
         // COMANDA DIGITAL (se guarda en Firestore y aparece en comandas.html)
         // ============================================
-        const orderTracker = document.getElementById('orderTracker');
-        const orderTrackerIcon = document.getElementById('orderTrackerIcon');
-        const orderTrackerStatus = document.getElementById('orderTrackerStatus');
-        const orderTrackerClose = document.getElementById('orderTrackerClose');
-
         const ORDER_STATUS_INFO = {
             nuevo: { icon: '🕐', label: 'Nuevo — esperando confirmación' },
             preparando: { icon: '🔥', label: 'En preparación' },
             listo: { icon: '✅', label: '¡Listo!' },
             entregado: { icon: '🐷', label: 'Entregado — ¡buen provecho!' }
         };
-
-        let orderTrackerUnsub = null;
+        const ORDER_STEPS = ['nuevo', 'preparando', 'listo', 'entregado'];
+        const ORDER_TYPE_LABEL = {
+            delivery: 'A domicilio',
+            pickup: 'Recoger en el local'
+        };
 
         async function sendDigitalOrder() {
             digitalOrderBtn.disabled = true;
@@ -3858,14 +3919,16 @@
                     countsForLoyalty: !user.isAnonymous
                 };
 
-                const docRef = await db.collection('comandas').add(orderData);
+                await db.collection('comandas').add(orderData);
 
                 addonQuantities = {};
                 cart = [];
                 updateCartBadge();
                 closeCart();
-
-                startOrderTracking(docRef.id);
+                // No hace falta "activar" nada más aquí: watchMyOrders() ya está
+                // escuchando todos los pedidos de este uid desde que inició sesión,
+                // así que en cuanto Firestore confirme este nuevo documento, el
+                // botón flotante "Mi pedido" aparece solo.
             } catch (err) {
                 console.error('Error al enviar la comanda digital:', err);
                 alert('No se pudo enviar tu pedido. Intenta de nuevo o usa el botón de WhatsApp.');
@@ -3874,24 +3937,85 @@
             }
         }
 
-        function startOrderTracking(orderId) {
-            if (orderTrackerUnsub) orderTrackerUnsub();
-            orderTracker.removeAttribute('hidden');
-            orderTrackerUnsub = db.collection('comandas').doc(orderId).onSnapshot(doc => {
-                if (!doc.exists) return;
-                const status = doc.data().status || 'nuevo';
-                const info = ORDER_STATUS_INFO[status] || ORDER_STATUS_INFO.nuevo;
-                orderTrackerIcon.textContent = info.icon;
-                orderTrackerStatus.textContent = info.label;
+        // ============================================
+        // MI PEDIDO (botón flotante + modal con línea de tiempo)
+        // Se basa en el uid, no en el pedido recién creado: así, si el
+        // cliente cierra la app y vuelve a entrar (o cambia de cuenta y
+        // regresa a la suya), su pedido activo reaparece solo, sin
+        // depender de que la pestaña siga abierta desde que lo hizo.
+        // ============================================
+        const orderFab = document.getElementById('orderFab');
+        const orderFabBadge = document.getElementById('orderFabBadge');
+        const orderModalOverlay = document.getElementById('orderModalOverlay');
+        const orderModalClose = document.getElementById('orderModalClose');
+        const orderModalIcon = document.getElementById('orderModalIcon');
+        const orderModalService = document.getElementById('orderModalService');
+        const orderModalStatusText = document.getElementById('orderModalStatusText');
+        const orderModalTotal = document.getElementById('orderModalTotal');
+        const orderStepEls = document.querySelectorAll('#orderSteps .order-step');
+
+        let orderWatchUnsub = null;
+
+        function renderOrderModal(order) {
+            const status = order.status || 'nuevo';
+            const info = ORDER_STATUS_INFO[status] || ORDER_STATUS_INFO.nuevo;
+
+            orderModalIcon.textContent = info.icon;
+            orderModalStatusText.textContent = info.label;
+            orderModalTotal.textContent = typeof order.total === 'number' ? 'Total: ' + formatPrice(order.total) : '';
+
+            orderModalService.textContent = order.orderType === 'dine_in'
+                ? 'Comer aquí' + (order.tableNumber ? ' — Mesa ' + order.tableNumber : '')
+                : (ORDER_TYPE_LABEL[order.orderType] || '');
+
+            const currentIdx = ORDER_STEPS.indexOf(status);
+            orderStepEls.forEach((el, i) => {
+                el.classList.toggle('done', i < currentIdx);
+                el.classList.toggle('current', i === currentIdx);
             });
         }
 
-        orderTrackerClose.addEventListener('click', () => {
-            orderTracker.setAttribute('hidden', '');
+        function showOrderFab(order) {
+            orderFab.removeAttribute('hidden');
+            renderOrderModal(order);
+        }
+
+        function hideOrderFab() {
+            orderFab.setAttribute('hidden', '');
+            orderModalOverlay.classList.remove('active');
+        }
+
+        function watchMyOrders(uid) {
+            if (orderWatchUnsub) orderWatchUnsub();
+            orderWatchUnsub = db.collection('comandas').where('uid', '==', uid)
+                .onSnapshot(snapshot => {
+                    let active = null;
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        if (d.status !== 'entregado') {
+                            const isNewer = active && d.createdAt && active.createdAt
+                                && d.createdAt.toMillis() > active.createdAt.toMillis();
+                            if (!active || isNewer) active = { id: doc.id, ...d };
+                        }
+                    });
+                    if (active) showOrderFab(active); else hideOrderFab();
+                }, err => console.error('Error viendo mis pedidos:', err));
+        }
+
+        function stopWatchingMyOrders() {
+            if (orderWatchUnsub) { orderWatchUnsub(); orderWatchUnsub = null; }
+            hideOrderFab();
+        }
+
+        orderFab.addEventListener('click', () => orderModalOverlay.classList.add('active'));
+        orderModalClose.addEventListener('click', () => orderModalOverlay.classList.remove('active'));
+        orderModalOverlay.addEventListener('click', (e) => {
+            if (e.target === orderModalOverlay) orderModalOverlay.classList.remove('active');
         });
 
         // ============================================
         // CUPONERA / PROGRAMA DE LEALTAD
+
         // ============================================
         const loyaltyFab = document.getElementById('loyaltyFab');
         const loyaltyFabBadge = document.getElementById('loyaltyFabBadge');
@@ -3920,8 +4044,7 @@
             if (typeof renderCart === 'function') renderCart();
             serviceBar.setAttribute('hidden', '');
             orderTypeOverlay.setAttribute('hidden', '');
-            if (orderTrackerUnsub) { orderTrackerUnsub(); orderTrackerUnsub = null; }
-            orderTracker.setAttribute('hidden', '');
+            stopWatchingMyOrders();
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
         }
 

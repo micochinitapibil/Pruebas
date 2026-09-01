@@ -92,6 +92,17 @@
     }
     .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--primary); color: var(--dark); width: 100%; }
+    .btn-danger {
+        background: var(--red);
+        color: #fff;
+        width: 100%;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    .btn-danger[hidden] { display: none; }
     .btn-google {
         background: #fff;
         color: #3c4043;
@@ -270,6 +281,10 @@
             <button id="tabActive" class="active">Activas</button>
             <button id="tabHistory">Historial</button>
         </div>
+
+        <button type="button" class="btn btn-danger" id="clearHistoryBtn" hidden>
+            <i class="fas fa-trash"></i> Vaciar historial
+        </button>
 
         <div id="emptyState">
             <i class="fas fa-clipboard-list"></i>
@@ -489,6 +504,7 @@
         currentView = 'active';
         document.getElementById('tabActive').classList.add('active');
         document.getElementById('tabHistory').classList.remove('active');
+        document.getElementById('clearHistoryBtn').hidden = true;
         renderOrders();
     });
 
@@ -496,7 +512,41 @@
         currentView = 'history';
         document.getElementById('tabHistory').classList.add('active');
         document.getElementById('tabActive').classList.remove('active');
+        document.getElementById('clearHistoryBtn').hidden = false;
         renderOrders();
+    });
+
+    // Borra en lote todas las comandas ya entregadas (solo historial; las
+    // activas nunca se tocan). Firestore limita 500 operaciones por batch,
+    // así que se parte en bloques de 450 por seguridad.
+    document.getElementById('clearHistoryBtn').addEventListener('click', async () => {
+        const delivered = allOrders.filter(o => o.status === 'entregado');
+        if (delivered.length === 0) {
+            showToast('El historial ya está vacío');
+            return;
+        }
+        const sure = confirm(
+            `¿Seguro que quieres borrar ${delivered.length} comanda(s) del historial?\n\n` +
+            'Esto las elimina permanentemente de la base de datos y no se puede deshacer.'
+        );
+        if (!sure) return;
+
+        const btn = document.getElementById('clearHistoryBtn');
+        btn.disabled = true;
+        try {
+            const CHUNK = 450;
+            for (let i = 0; i < delivered.length; i += CHUNK) {
+                const batch = db.batch();
+                delivered.slice(i, i + CHUNK).forEach(o => batch.delete(comandasRef.doc(o.id)));
+                await batch.commit();
+            }
+            showToast('Historial vaciado');
+        } catch (err) {
+            console.error(err);
+            showToast('Error borrando historial: ' + err.message);
+        } finally {
+            btn.disabled = false;
+        }
     });
 </script>
 </body>
