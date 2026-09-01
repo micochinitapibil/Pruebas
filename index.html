@@ -2876,6 +2876,7 @@
         // LOGIN DE CLIENTES
         // ============================================
         let isGuest = false;
+        let lastSessionKey; // undefined = aún no se resuelve la sesión inicial; luego 'user:<uid>' | 'anon:<uid>' | null
         const googleProvider = new firebase.auth.GoogleAuthProvider();
 
         const authOverlay = document.getElementById('authOverlay');
@@ -2960,6 +2961,8 @@
 
         auth.onAuthStateChanged(user => {
             if (user && !user.isAnonymous) {
+                if (lastSessionKey !== undefined && lastSessionKey !== 'user:' + user.uid) resetSessionState();
+                lastSessionKey = 'user:' + user.uid;
                 isGuest = false;
                 authOverlay.setAttribute('hidden', '');
                 updateUserUI(user);
@@ -2967,6 +2970,8 @@
                 startLoyaltyTracking(user.uid);
             } else if (user && user.isAnonymous) {
                 // Invitado que ya había hecho un pedido digital antes: lo dejamos pasar directo
+                if (lastSessionKey !== undefined && lastSessionKey !== 'anon:' + user.uid) resetSessionState();
+                lastSessionKey = 'anon:' + user.uid;
                 isGuest = true;
                 authOverlay.setAttribute('hidden', '');
                 updateUserUI(null);
@@ -2976,6 +2981,8 @@
                 updateUserUI(null);
                 showLoyaltyGuestView();
             } else {
+                if (lastSessionKey !== undefined && lastSessionKey !== null) resetSessionState();
+                lastSessionKey = null;
                 authOverlay.removeAttribute('hidden');
                 updateUserUI(null);
                 showLoyaltyGuestView();
@@ -3900,6 +3907,23 @@
         const loyaltyFreeCount = document.getElementById('loyaltyFreeCount');
 
         let clienteUnsub = null;
+
+        // Se llama cada vez que la sesión cambia de verdad (cerró sesión, o entró
+        // con una cuenta distinta a la anterior) para que el pedido de un cliente
+        // no se herede al siguiente que use el mismo dispositivo sin recargar.
+        function resetSessionState() {
+            orderType = null;
+            tableNumber = null;
+            orderTypeAsked = false;
+            cart = [];
+            if (typeof updateCartBadge === 'function') updateCartBadge();
+            if (typeof renderCart === 'function') renderCart();
+            serviceBar.setAttribute('hidden', '');
+            orderTypeOverlay.setAttribute('hidden', '');
+            if (orderTrackerUnsub) { orderTrackerUnsub(); orderTrackerUnsub = null; }
+            orderTracker.setAttribute('hidden', '');
+            if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
+        }
 
         function updateLoyaltyThresholdUI() {
             loyaltyGuestRule.innerHTML = `Cada <strong>${LOYALTY_THRESHOLD}</strong> pedidos entregados, ¡el siguiente platillo va por la casa!`;
