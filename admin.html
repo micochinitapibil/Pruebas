@@ -216,6 +216,16 @@
     }
     .product-item .info .meta { font-size: 13px; color: var(--secondary); font-weight: 600; }
     .product-item .info .name.inactive { text-decoration: line-through; color: #bbb; }
+    .redeemable-badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--secondary);
+        background: #fff4d6;
+        padding: 1px 8px;
+        border-radius: 10px;
+        margin-top: 3px;
+    }
     .product-actions {
         display: flex; flex-direction: column; align-items: center; gap: 8px;
         flex-shrink: 0;
@@ -307,7 +317,7 @@
                 </div>
             </div>
             <p style="font-size:12px; color:#888; margin-bottom:12px;">
-                Cada vez que un cliente logueado (no invitado) llegue a este número de pedidos entregados, gana un platillo gratis. Se repite cada vez que vuelve a juntar esa cantidad.
+                Cada vez que un cliente logueado (no invitado) llegue a este número de pedidos entregados, gana un platillo gratis para canjear en su siguiente pedido. Solo puede tener un cupón sin usar a la vez: si ya tiene uno guardado, no se le genera otro hasta que lo use. Marca abajo qué platillos se pueden canjear con "🎁 Disponible para canjear con cupón gratis".
             </p>
             <button class="btn btn-green" id="saveConfigBtn" style="width:100%;">Guardar configuración</button>
         </div>
@@ -387,6 +397,14 @@
                 <span class="slider"></span>
             </label>
             <span style="font-size:13px; font-weight:600;">Producto activo (visible en el menú)</span>
+        </div>
+
+        <div class="field" style="display:flex; align-items:center; gap:10px;">
+            <label class="switch">
+                <input type="checkbox" id="f_redeemable">
+                <span class="slider"></span>
+            </label>
+            <span style="font-size:13px; font-weight:600;">🎁 Disponible para canjear con cupón gratis</span>
         </div>
 
         <div class="modal-footer">
@@ -564,6 +582,7 @@
             <div class="info">
                 <div class="name ${p.active ? '' : 'inactive'}">${p.name}</div>
                 <div class="meta">MX$${Number(p.price).toFixed(2)}</div>
+                ${p.redeemable ? '<span class="redeemable-badge">🎁 Canjeable</span>' : ''}
             </div>
             <div class="product-actions">
                 <label class="switch">
@@ -610,6 +629,7 @@
         document.getElementById('f_image_github').value = '';
         document.getElementById('f_image_file').value = '';
         document.getElementById('f_active').checked = true;
+        document.getElementById('f_redeemable').checked = false;
         document.getElementById('imagePreview').style.display = 'none';
         document.getElementById('uploadStatus').textContent = '';
         setImageSource('github');
@@ -671,6 +691,7 @@
         document.getElementById('f_category').value = p.category;
         document.getElementById('f_desc').value = p.desc || '';
         document.getElementById('f_active').checked = !!p.active;
+        document.getElementById('f_redeemable').checked = !!p.redeemable;
         if (p.imageSource === 'cloudinary') {
             setImageSource('cloudinary');
             uploadedCloudinaryUrl = p.imageValue;
@@ -694,6 +715,7 @@
         const category = document.getElementById('f_category').value;
         const desc = document.getElementById('f_desc').value.trim();
         const active = document.getElementById('f_active').checked;
+        const redeemable = document.getElementById('f_redeemable').checked;
 
         if (!name || isNaN(price)) {
             showToast('Falta el nombre o el precio');
@@ -708,7 +730,7 @@
             imageValue = uploadedCloudinaryUrl || '';
         }
 
-        const data = { name, price, category, desc, active, imageSource, imageValue };
+        const data = { name, price, category, desc, active, redeemable, imageSource, imageValue };
 
         if (editingId) {
             productosRef.doc(editingId).update(data)

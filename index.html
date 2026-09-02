@@ -1361,6 +1361,22 @@
             gap: 8px;
         }
 
+        .coupon-pick-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 6px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        .coupon-pick-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            accent-color: var(--primary);
+        }
+        .coupon-pick-item .addon-item-price { color: var(--green); }
+
         .product-modal-overlay {
             position: fixed;
             inset: 0;
@@ -2906,6 +2922,32 @@
         </div>
     </div>
 
+    <!-- MODAL: OFERTA DE CUPÓN GRATIS -->
+    <div class="addons-overlay" id="couponOfferOverlay">
+        <div class="addons-modal" style="text-align:center;">
+            <div style="font-size:42px; margin-bottom:6px;">🎁</div>
+            <h3>¡Tienes un platillo gratis disponible!</h3>
+            <p class="addons-subtitle">Puedes usarlo en este pedido o guardarlo para otro día.</p>
+            <div class="addons-actions">
+                <button class="addons-skip-btn" id="couponDeclineBtn">No, gracias</button>
+                <button class="addons-continue-btn" id="couponAcceptBtn"><i class="fas fa-gift"></i> Sí, quiero mi platillo gratis</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ELEGIR PLATILLO GRATIS -->
+    <div class="addons-overlay" id="couponPickOverlay">
+        <div class="addons-modal">
+            <h3>Elige tu platillo gratis 🎁</h3>
+            <p class="addons-subtitle">Solo puedes elegir uno</p>
+            <div id="couponPickList"><!-- generado por JS --></div>
+            <div class="addons-actions">
+                <button class="addons-skip-btn" id="couponPickBackBtn">Cancelar</button>
+                <button class="addons-continue-btn" id="couponPickConfirmBtn"><i class="fas fa-check"></i> Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ADICIONALES ANTES DE FINALIZAR PEDIDO -->
     <div class="addons-overlay" id="addonsOverlay">
         <div class="addons-modal">
@@ -3097,6 +3139,7 @@
         renderTableGrid(TABLE_COUNT);
 
         let LOYALTY_THRESHOLD = 7; // valor de respaldo mientras carga la configuración real
+        let myFreeDishesAvailable = 0; // cupones sin usar del cliente logueado actual
 
         // Escucha la config del negocio en tiempo real (mesas y umbral de cuponera),
         // así si el admin la cambia no hace falta ni recargar la página.
@@ -3439,7 +3482,8 @@
                         name: data.name,
                         price: priceStr,
                         category: data.category,
-                        desc: data.desc || ''
+                        desc: data.desc || '',
+                        redeemable: !!data.redeemable
                     });
                     if (data.imageSource === 'cloudinary' && data.imageValue) {
                         liveImageMap[data.name] = data.imageValue;
@@ -3872,7 +3916,95 @@
         digitalOrderBtn.addEventListener('click', () => {
             if (cart.length === 0) return;
             pendingCheckoutType = 'digital';
+            maybeOfferCoupon();
+        });
+
+        // ============================================
+        // CUPÓN DE PLATILLO GRATIS (se ofrece solo al usar "Finalizar
+        // pedido", solo a clientes logueados con un cupón disponible)
+        // ============================================
+        const couponOfferOverlay = document.getElementById('couponOfferOverlay');
+        const couponPickOverlay = document.getElementById('couponPickOverlay');
+        const couponPickList = document.getElementById('couponPickList');
+        let redeemedFreeItem = null; // { name } o null
+
+        function maybeOfferCoupon() {
+            redeemedFreeItem = null;
+            const eligible = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myFreeDishesAvailable > 0;
+            if (eligible) {
+                couponOfferOverlay.classList.add('active');
+            } else {
+                openAddonsModal();
+            }
+        }
+
+        document.getElementById('couponDeclineBtn').addEventListener('click', () => {
+            couponOfferOverlay.classList.remove('active');
+            redeemedFreeItem = null;
             openAddonsModal();
+        });
+
+        document.getElementById('couponAcceptBtn').addEventListener('click', () => {
+            couponOfferOverlay.classList.remove('active');
+            openCouponPickModal();
+        });
+
+        couponOfferOverlay.addEventListener('click', (e) => {
+            if (e.target === couponOfferOverlay) {
+                couponOfferOverlay.classList.remove('active');
+                redeemedFreeItem = null;
+                openAddonsModal();
+            }
+        });
+
+        function openCouponPickModal() {
+            const eligibleItems = menuItems.filter(i => i.redeemable);
+            if (eligibleItems.length === 0) {
+                alert('En este momento no hay platillos disponibles para canjear. Tu cupón sigue guardado para tu próximo pedido.');
+                redeemedFreeItem = null;
+                openAddonsModal();
+                return;
+            }
+            couponPickList.innerHTML = eligibleItems.map(item => `
+                <label class="coupon-pick-item">
+                    <input type="radio" name="couponPick" value="${item.name}">
+                    <img class="addon-item-img" src="${liveImageMap[item.name] || ''}" onerror="this.style.visibility='hidden'">
+                    <div class="addon-item-info">
+                        <div class="addon-item-name">${item.name}</div>
+                        <div class="addon-item-price">GRATIS</div>
+                    </div>
+                </label>
+            `).join('');
+            couponPickOverlay.classList.add('active');
+        }
+
+        function closeCouponPickModal() {
+            couponPickOverlay.classList.remove('active');
+        }
+
+        document.getElementById('couponPickBackBtn').addEventListener('click', () => {
+            closeCouponPickModal();
+            redeemedFreeItem = null;
+            openAddonsModal();
+        });
+
+        document.getElementById('couponPickConfirmBtn').addEventListener('click', () => {
+            const checked = couponPickList.querySelector('input[name="couponPick"]:checked');
+            if (!checked) {
+                alert('Elige un platillo de la lista para continuar.');
+                return;
+            }
+            redeemedFreeItem = { name: checked.value };
+            closeCouponPickModal();
+            openAddonsModal();
+        });
+
+        couponPickOverlay.addEventListener('click', (e) => {
+            if (e.target === couponPickOverlay) {
+                closeCouponPickModal();
+                redeemedFreeItem = null;
+                openAddonsModal();
+            }
         });
 
         // ============================================
@@ -3908,12 +4040,17 @@
                 const fee = getDeliveryFee();
                 const user = auth.currentUser;
 
+                const items = cart.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) }));
+                if (redeemedFreeItem) {
+                    items.push({ name: redeemedFreeItem.name, qty: 1, price: 0, freeRedeemed: true });
+                }
+
                 const orderData = {
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'nuevo',
                     orderType: orderType,
                     tableNumber: orderType === 'dine_in' ? tableNumber : null,
-                    items: cart.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) })),
+                    items: items,
                     addons: addonsData,
                     subtotal: getCartSubtotal(),
                     deliveryFee: fee,
@@ -3921,13 +4058,33 @@
                     uid: user.uid,
                     customerEmail: user.isAnonymous ? null : user.email,
                     customerName: user.isAnonymous ? null : (user.displayName || null),
-                    countsForLoyalty: !user.isAnonymous
+                    countsForLoyalty: !user.isAnonymous,
+                    freeDishRedeemed: redeemedFreeItem ? redeemedFreeItem.name : null
                 };
 
-                await db.collection('comandas').add(orderData);
+                const newOrderRef = db.collection('comandas').doc();
+
+                if (redeemedFreeItem && !user.isAnonymous) {
+                    // Transacción: solo se guarda el pedido si el cupón sigue
+                    // disponible en ese instante, y se descuenta a la vez
+                    // (evita que se use dos veces desde dos pestañas/dispositivos).
+                    await db.runTransaction(async (tx) => {
+                        const clienteRef = db.collection('clientes').doc(user.uid);
+                        const clienteDoc = await tx.get(clienteRef);
+                        const free = clienteDoc.exists ? (clienteDoc.data().freeDishesAvailable || 0) : 0;
+                        if (free < 1) {
+                            throw new Error('CUPON_NO_DISPONIBLE');
+                        }
+                        tx.set(clienteRef, { freeDishesAvailable: free - 1 }, { merge: true });
+                        tx.set(newOrderRef, orderData);
+                    });
+                } else {
+                    await newOrderRef.set(orderData);
+                }
 
                 addonQuantities = {};
                 cart = [];
+                redeemedFreeItem = null;
                 updateCartBadge();
                 closeCart();
                 // No hace falta "activar" nada más aquí: watchMyOrders() ya está
@@ -3936,7 +4093,12 @@
                 // botón flotante "Mi pedido" aparece solo.
             } catch (err) {
                 console.error('Error al enviar la comanda digital:', err);
-                alert('No se pudo enviar tu pedido. Intenta de nuevo o usa el botón de WhatsApp.');
+                if (err.message === 'CUPON_NO_DISPONIBLE') {
+                    alert('Tu cupón de platillo gratis ya no está disponible (puede que se haya usado en otro dispositivo). Vuelve a intentar enviar tu pedido.');
+                    redeemedFreeItem = null;
+                } else {
+                    alert('No se pudo enviar tu pedido. Intenta de nuevo o usa el botón de WhatsApp.');
+                }
             } finally {
                 digitalOrderBtn.disabled = false;
             }
@@ -4076,6 +4238,7 @@
 
         function showLoyaltyGuestView() {
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
+            myFreeDishesAvailable = 0;
             loyaltyGuestView.hidden = false;
             loyaltyUserView.hidden = true;
             loyaltyFabBadge.hidden = true;
@@ -4089,6 +4252,7 @@
                 const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
                 const completed = data.ordersCompleted || 0;
                 const free = data.freeDishesAvailable || 0;
+                myFreeDishesAvailable = free;
                 const progressInCycle = completed % LOYALTY_THRESHOLD;
                 const pct = Math.round((progressInCycle / LOYALTY_THRESHOLD) * 100);
 
