@@ -1814,84 +1814,97 @@
 
         .order-fab-badge {
             position: absolute;
-            top: -2px;
-            right: -2px;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
+            top: -6px;
+            right: -6px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 5px;
+            border-radius: 11px;
             background: #2ecc71;
             border: 2px solid white;
+            color: white;
+            font-size: 12px;
+            font-weight: 800;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             animation: orderFabPulse 1.6s ease-in-out infinite;
         }
 
         @keyframes orderFabPulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.65; }
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.12); }
         }
 
-        .order-modal-service {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--accent);
-            margin-bottom: 4px !important;
+        .order-list-hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: -8px !important;
         }
 
-        .order-steps {
-            display: flex;
-            justify-content: space-between;
-            margin: 22px 0 14px;
-        }
-
-        .order-step {
-            flex: 1;
+        .order-list {
+            max-height: 56vh;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 6px;
+            gap: 12px;
+            margin-top: 16px;
+            padding-right: 2px;
+            text-align: left;
         }
 
-        .order-step .dot {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: white;
-            border: 2px solid #ddd;
+        .order-item-card {
+            background: var(--light);
+            border-radius: 14px;
+            padding: 14px;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .order-item-top {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: white;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .order-item-icon { font-size: 22px; line-height: 1; }
+
+        .order-item-info { flex: 1; min-width: 0; }
+
+        .order-item-status {
+            font-size: 14px;
             font-weight: 800;
+            color: var(--secondary);
         }
 
-        .order-step .label {
-            font-size: 10.5px;
-            color: #999;
+        .order-item-meta {
+            font-size: 11.5px;
+            color: #888;
+            font-weight: 600;
+        }
+
+        .order-item-progress {
+            display: flex;
+            gap: 4px;
+            margin: 10px 0 8px;
+        }
+
+        .order-item-progress .seg {
+            flex: 1;
+            height: 5px;
+            border-radius: 3px;
+            background: #e4dcc8;
+        }
+
+        .order-item-progress .seg.done { background: var(--primary); }
+        .order-item-progress .seg.current { background: var(--secondary); }
+
+        .order-item-total {
+            font-size: 12.5px;
+            color: #666;
             font-weight: 700;
-            text-align: center;
-        }
-
-        .order-step.done .dot { background: var(--primary); border-color: var(--primary); }
-        .order-step.done .dot::after { content: '✓'; }
-
-        .order-step.current .dot {
-            background: var(--secondary);
-            border-color: var(--secondary);
-            box-shadow: 0 0 0 5px rgba(0,0,0,0.08);
-        }
-
-        .order-step.done .label,
-        .order-step.current .label { color: var(--secondary); }
-
-        .order-modal-status {
-            font-size: 15px !important;
-            font-weight: 800 !important;
-            color: var(--secondary) !important;
-        }
-
-        .order-modal-total {
-            font-size: 13px !important;
-            color: #888 !important;
+            text-align: right;
         }
 
         /* ============================================
@@ -2848,23 +2861,15 @@
         <span class="order-fab-badge" id="orderFabBadge"></span>
     </button>
 
-    <!-- MODAL: ESTATUS DE MI PEDIDO -->
+    <!-- MODAL: MIS PEDIDOS EN CURSO -->
     <div class="loyalty-modal-overlay" id="orderModalOverlay">
         <div class="loyalty-modal">
             <button class="loyalty-modal-close" id="orderModalClose" aria-label="Cerrar">&times;</button>
-            <div class="loyalty-modal-icon" id="orderModalIcon">🕐</div>
-            <h3>Tu pedido</h3>
-            <p class="order-modal-service" id="orderModalService"></p>
+            <div class="loyalty-modal-icon">📋</div>
+            <h3>Tus pedidos en curso</h3>
+            <p class="order-list-hint">Desliza hacia abajo para ver todos</p>
 
-            <div class="order-steps" id="orderSteps">
-                <div class="order-step" data-step="nuevo"><span class="dot"></span><span class="label">Nuevo</span></div>
-                <div class="order-step" data-step="preparando"><span class="dot"></span><span class="label">Preparando</span></div>
-                <div class="order-step" data-step="listo"><span class="dot"></span><span class="label">Listo</span></div>
-                <div class="order-step" data-step="entregado"><span class="dot"></span><span class="label">Entregado</span></div>
-            </div>
-
-            <p class="order-modal-status" id="orderModalStatusText">Nuevo — esperando confirmación</p>
-            <p class="order-modal-total" id="orderModalTotal"></p>
+            <div class="order-list" id="orderList"><!-- generado por JS --></div>
         </div>
     </div>
 
@@ -3938,73 +3943,89 @@
         }
 
         // ============================================
-        // MI PEDIDO (botón flotante + modal con línea de tiempo)
-        // Se basa en el uid, no en el pedido recién creado: así, si el
+        // MIS PEDIDOS (botón flotante + modal con lista de tarjetas)
+        // Se basa en el uid, no en un pedido en particular: así, si el
         // cliente cierra la app y vuelve a entrar (o cambia de cuenta y
-        // regresa a la suya), su pedido activo reaparece solo, sin
-        // depender de que la pestaña siga abierta desde que lo hizo.
+        // regresa a la suya), sus pedidos activos reaparecen solos, sin
+        // depender de que la pestaña siguiera abierta desde que los hizo.
+        // Además soporta VARIOS pedidos activos a la vez: si hace un
+        // segundo pedido sin que el primero haya llegado a "entregado",
+        // ambos se ven en la lista (cada uno desaparece por su cuenta en
+        // cuanto el admin lo marca como entregado).
         // ============================================
         const orderFab = document.getElementById('orderFab');
         const orderFabBadge = document.getElementById('orderFabBadge');
         const orderModalOverlay = document.getElementById('orderModalOverlay');
         const orderModalClose = document.getElementById('orderModalClose');
-        const orderModalIcon = document.getElementById('orderModalIcon');
-        const orderModalService = document.getElementById('orderModalService');
-        const orderModalStatusText = document.getElementById('orderModalStatusText');
-        const orderModalTotal = document.getElementById('orderModalTotal');
-        const orderStepEls = document.querySelectorAll('#orderSteps .order-step');
+        const orderListEl = document.getElementById('orderList');
 
         let orderWatchUnsub = null;
+        let activeOrders = [];
 
-        function renderOrderModal(order) {
-            const status = order.status || 'nuevo';
-            const info = ORDER_STATUS_INFO[status] || ORDER_STATUS_INFO.nuevo;
-
-            orderModalIcon.textContent = info.icon;
-            orderModalStatusText.textContent = info.label;
-            orderModalTotal.textContent = typeof order.total === 'number' ? 'Total: ' + formatPrice(order.total) : '';
-
-            orderModalService.textContent = order.orderType === 'dine_in'
-                ? 'Comer aquí' + (order.tableNumber ? ' — Mesa ' + order.tableNumber : '')
-                : (ORDER_TYPE_LABEL[order.orderType] || '');
-
-            const currentIdx = ORDER_STEPS.indexOf(status);
-            orderStepEls.forEach((el, i) => {
-                el.classList.toggle('done', i < currentIdx);
-                el.classList.toggle('current', i === currentIdx);
-            });
+        function formatOrderTime(ts) {
+            if (!ts || !ts.toDate) return 'hace un momento';
+            return ts.toDate().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
         }
 
-        function showOrderFab(order) {
+        function renderOrderList() {
+            orderListEl.innerHTML = activeOrders.map(o => {
+                const status = o.status || 'nuevo';
+                const info = ORDER_STATUS_INFO[status] || ORDER_STATUS_INFO.nuevo;
+                const currentIdx = ORDER_STEPS.indexOf(status);
+                const segsHtml = ORDER_STEPS.map((s, i) => {
+                    const cls = i < currentIdx ? 'done' : (i === currentIdx ? 'current' : '');
+                    return `<span class="seg ${cls}"></span>`;
+                }).join('');
+
+                const service = o.orderType === 'dine_in'
+                    ? 'Mesa ' + (o.tableNumber ?? '—')
+                    : (ORDER_TYPE_LABEL[o.orderType] || '');
+
+                return `
+                <div class="order-item-card">
+                    <div class="order-item-top">
+                        <span class="order-item-icon">${info.icon}</span>
+                        <div class="order-item-info">
+                            <div class="order-item-status">${info.label}</div>
+                            <div class="order-item-meta">${service} · Pedido de las ${formatOrderTime(o.createdAt)}</div>
+                        </div>
+                    </div>
+                    <div class="order-item-progress">${segsHtml}</div>
+                    <div class="order-item-total">${typeof o.total === 'number' ? 'Total: ' + formatPrice(o.total) : ''}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderOrderFab() {
+            if (activeOrders.length === 0) {
+                orderFab.setAttribute('hidden', '');
+                orderModalOverlay.classList.remove('active');
+                return;
+            }
             orderFab.removeAttribute('hidden');
-            renderOrderModal(order);
-        }
-
-        function hideOrderFab() {
-            orderFab.setAttribute('hidden', '');
-            orderModalOverlay.classList.remove('active');
+            orderFabBadge.textContent = activeOrders.length;
+            renderOrderList();
         }
 
         function watchMyOrders(uid) {
             if (orderWatchUnsub) orderWatchUnsub();
             orderWatchUnsub = db.collection('comandas').where('uid', '==', uid)
                 .onSnapshot(snapshot => {
-                    let active = null;
+                    activeOrders = [];
                     snapshot.forEach(doc => {
                         const d = doc.data();
-                        if (d.status !== 'entregado') {
-                            const isNewer = active && d.createdAt && active.createdAt
-                                && d.createdAt.toMillis() > active.createdAt.toMillis();
-                            if (!active || isNewer) active = { id: doc.id, ...d };
-                        }
+                        if (d.status !== 'entregado') activeOrders.push({ id: doc.id, ...d });
                     });
-                    if (active) showOrderFab(active); else hideOrderFab();
+                    // Más reciente primero
+                    activeOrders.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+                    renderOrderFab();
                 }, err => console.error('Error viendo mis pedidos:', err));
         }
 
         function stopWatchingMyOrders() {
             if (orderWatchUnsub) { orderWatchUnsub(); orderWatchUnsub = null; }
-            hideOrderFab();
+            activeOrders = [];
+            renderOrderFab();
         }
 
         orderFab.addEventListener('click', () => orderModalOverlay.classList.add('active'));
