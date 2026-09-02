@@ -1361,6 +1361,44 @@
             gap: 8px;
         }
 
+        .addons-main-btn {
+            width: 100%;
+            padding: 13px 10px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.35s ease, color 0.35s ease, transform 0.25s ease;
+        }
+
+        .addons-main-btn.state-skip {
+            background: #f2f2f2;
+            color: var(--text);
+        }
+
+        .addons-main-btn.state-continue {
+            color: white;
+            animation: addonsBtnPulse 0.35s ease;
+        }
+
+        .addons-main-btn.state-continue.type-whatsapp {
+            background: var(--green);
+        }
+
+        .addons-main-btn.state-continue.type-digital {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+
+        @keyframes addonsBtnPulse {
+            0% { transform: scale(0.94); opacity: 0.6; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         .coupon-pick-item {
             display: flex;
             align-items: center;
@@ -1921,6 +1959,30 @@
             color: #666;
             font-weight: 700;
             text-align: right;
+        }
+
+        .order-item-dishes {
+            list-style: none;
+            margin: 4px 0 10px;
+            padding: 8px 10px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 10px;
+        }
+
+        .order-item-dishes li {
+            font-size: 12.5px;
+            color: var(--text);
+            font-weight: 600;
+            padding: 3px 0;
+        }
+
+        .order-item-dishes li.free-dish {
+            color: var(--green);
+            font-weight: 800;
+        }
+
+        .order-item-dishes li.addon-dish {
+            color: var(--secondary);
         }
 
         /* ============================================
@@ -2955,10 +3017,7 @@
             <p class="addons-subtitle">Se suman aparte a tu pedido</p>
             <div id="addonsList"></div>
             <div class="addons-actions">
-                <button class="addons-skip-btn" id="addonsSkipBtn">No gracias, continuar</button>
-                <button class="addons-continue-btn" id="addonsContinueBtn">
-                    <i class="fab fa-whatsapp"></i> Finalizar pedido
-                </button>
+                <button class="addons-main-btn state-skip" id="addonsMainBtn">No gracias, continuar</button>
             </div>
         </div>
     </div>
@@ -3800,8 +3859,28 @@
 
         const addonsOverlay = document.getElementById('addonsOverlay');
         const addonsList = document.getElementById('addonsList');
-        const addonsSkipBtn = document.getElementById('addonsSkipBtn');
-        const addonsContinueBtn = document.getElementById('addonsContinueBtn');
+        const addonsMainBtn = document.getElementById('addonsMainBtn');
+
+        function totalAddonsQty() {
+            return Object.values(addonQuantities).reduce((sum, q) => sum + q, 0);
+        }
+
+        function updateAddonsMainBtn() {
+            const hasAddons = totalAddonsQty() > 0;
+            if (hasAddons) {
+                addonsMainBtn.classList.remove('state-skip');
+                addonsMainBtn.classList.add('state-continue');
+                addonsMainBtn.classList.toggle('type-whatsapp', pendingCheckoutType === 'whatsapp');
+                addonsMainBtn.classList.toggle('type-digital', pendingCheckoutType === 'digital');
+                addonsMainBtn.innerHTML = pendingCheckoutType === 'whatsapp'
+                    ? '<i class="fab fa-whatsapp"></i> Finalizar pedido'
+                    : '<i class="fas fa-check"></i> Finalizar pedido';
+            } else {
+                addonsMainBtn.classList.remove('state-continue', 'type-whatsapp', 'type-digital');
+                addonsMainBtn.classList.add('state-skip');
+                addonsMainBtn.innerHTML = 'No gracias, continuar';
+            }
+        }
 
         function renderAddons() {
             addonsList.innerHTML = ADDONS.map(a => {
@@ -3837,6 +3916,8 @@
                     renderAddons();
                 });
             });
+
+            updateAddonsMainBtn();
         }
 
         function openAddonsModal() {
@@ -3894,13 +3975,7 @@
             window.open(url, '_blank');
         }
 
-        addonsSkipBtn.addEventListener('click', () => {
-            addonQuantities = {};
-            closeAddonsModal();
-            if (pendingCheckoutType === 'digital') sendDigitalOrder(); else sendWhatsAppOrder();
-        });
-
-        addonsContinueBtn.addEventListener('click', () => {
+        addonsMainBtn.addEventListener('click', () => {
             closeAddonsModal();
             if (pendingCheckoutType === 'digital') sendDigitalOrder(); else sendWhatsAppOrder();
         });
@@ -4143,6 +4218,14 @@
                     ? 'Mesa ' + (o.tableNumber ?? '—')
                     : (ORDER_TYPE_LABEL[o.orderType] || '');
 
+                const dishesHtml = (o.items || []).map(i =>
+                    i.freeRedeemed
+                        ? `<li class="free-dish">🎁 ${i.qty}x ${i.name} — Gratis</li>`
+                        : `<li>${i.qty}x ${i.name}</li>`
+                ).join('') + (o.addons || []).map(a =>
+                    `<li class="addon-dish">+ ${a.qty}x ${a.name}</li>`
+                ).join('');
+
                 return `
                 <div class="order-item-card">
                     <div class="order-item-top">
@@ -4152,6 +4235,7 @@
                             <div class="order-item-meta">${service} · Pedido de las ${formatOrderTime(o.createdAt)}</div>
                         </div>
                     </div>
+                    ${dishesHtml ? `<ul class="order-item-dishes">${dishesHtml}</ul>` : ''}
                     <div class="order-item-progress">${segsHtml}</div>
                     <div class="order-item-total">${typeof o.total === 'number' ? 'Total: ' + formatPrice(o.total) : ''}</div>
                 </div>`;
