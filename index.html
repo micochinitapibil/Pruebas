@@ -1229,19 +1229,19 @@
         .addons-modal {
             background: white;
             border-radius: 20px;
-            padding: 18px 18px;
+            padding: 20px 20px;
             max-width: 400px;
             width: 100%;
-            max-height: 92vh;
+            max-height: 94vh;
             overflow-y: auto;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
 
         .addons-modal h3 {
-            font-size: 17px;
+            font-size: 18px;
             color: var(--dark);
             text-align: center;
-            margin-bottom: 2px;
+            margin-bottom: 10px;
         }
 
         .addons-subtitle {
@@ -1254,15 +1254,15 @@
         .addon-item {
             display: flex;
             align-items: center;
-            gap: 9px;
-            padding: 6px 0;
+            gap: 10px;
+            padding: 7px 0;
             border-bottom: 1px solid #f0f0f0;
         }
 
         .addon-item-img {
-            width: 38px;
-            height: 38px;
-            border-radius: 8px;
+            width: 46px;
+            height: 46px;
+            border-radius: 9px;
             object-fit: cover;
             flex-shrink: 0;
         }
@@ -1273,14 +1273,14 @@
         }
 
         .addon-item-name {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
             color: var(--dark);
-            line-height: 1.2;
+            line-height: 1.25;
         }
 
         .addon-item-price {
-            font-size: 11.5px;
+            font-size: 12px;
             color: var(--secondary);
             font-weight: 700;
         }
@@ -1288,18 +1288,18 @@
         .addon-item-controls {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 7px;
             flex-shrink: 0;
         }
 
         .addon-add-btn {
-            width: 26px;
-            height: 26px;
+            width: 29px;
+            height: 29px;
             border-radius: 50%;
             border: 2px solid var(--primary);
             background: white;
             color: var(--secondary);
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 900;
             cursor: pointer;
             display: flex;
@@ -1308,13 +1308,13 @@
         }
 
         .addon-remove-btn {
-            width: 22px;
-            height: 22px;
+            width: 25px;
+            height: 25px;
             border-radius: 50%;
             border: none;
             background: #f2f2f2;
             color: var(--text);
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 900;
             cursor: pointer;
             display: flex;
@@ -1323,9 +1323,9 @@
         }
 
         .addon-qty-count {
-            font-size: 12.5px;
+            font-size: 13px;
             font-weight: 700;
-            min-width: 14px;
+            min-width: 15px;
             text-align: center;
         }
 
@@ -3013,8 +3013,7 @@
     <!-- MODAL: ADICIONALES ANTES DE FINALIZAR PEDIDO -->
     <div class="addons-overlay" id="addonsOverlay">
         <div class="addons-modal">
-            <h3>¿Quieres agregar algo extra? 🌶️</h3>
-            <p class="addons-subtitle">Se suman aparte a tu pedido</p>
+            <h3>¿Quieres agregar algo extra?</h3>
             <div id="addonsList"></div>
             <div class="addons-actions">
                 <button class="addons-main-btn state-skip" id="addonsMainBtn">No gracias, continuar</button>
