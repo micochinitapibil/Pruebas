@@ -1060,10 +1060,10 @@
         /* RESPONSIVE */
         @media (max-width: 768px) {
             .logo {
-                font-size: 15px;
+                font-size: 12px;
                 font-weight: 500;
                 gap: 8px;
-                letter-spacing: 0.3px;
+                letter-spacing: 0.2px;
             }
 
             .logo img {
@@ -1848,7 +1848,7 @@
         .order-fab {
             position: fixed;
             right: 16px;
-            bottom: 164px;
+            top: 190px;
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -1991,7 +1991,7 @@
         .loyalty-fab {
             position: fixed;
             right: 16px;
-            bottom: 96px;
+            top: 130px;
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -2503,8 +2503,8 @@
             padding: 10px 20px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 10px;
+            justify-content: center;
+            gap: 28px;
         }
 
         .service-bar[hidden] {
@@ -4201,7 +4201,7 @@
         // nada; su posición se guarda en localStorage y se recuerda la
         // próxima vez que entre al sitio.
         // ============================================
-        function makeDraggable(el, storageKey, fallbackRight, fallbackBottom) {
+        function makeDraggable(el, storageKey, fallbackRight, fallbackTop) {
             const SIZE = 36;
             const MARGIN = 6;
 
@@ -4229,8 +4229,7 @@
                     applyPos(x, y);
                 } else {
                     const x = window.innerWidth - SIZE - fallbackRight;
-                    const y = window.innerHeight - SIZE - fallbackBottom;
-                    const c = clamp(x, y);
+                    const c = clamp(x, fallbackTop);
                     applyPos(c.x, c.y);
                 }
             }
@@ -4297,7 +4296,7 @@
             });
         }
 
-        makeDraggable(orderFab, 'fabPos_order', 16, 164);
+        makeDraggable(orderFab, 'fabPos_order', 16, 190);
         let orderWatchUnsub = null;
         let activeOrders = [];
 
@@ -4388,7 +4387,7 @@
         // ============================================
         const loyaltyFab = document.getElementById('loyaltyFab');
         const loyaltyFabBadge = document.getElementById('loyaltyFabBadge');
-        makeDraggable(loyaltyFab, 'fabPos_loyalty', 16, 96);
+        makeDraggable(loyaltyFab, 'fabPos_loyalty', 16, 130);
 
         const loyaltyModalOverlay = document.getElementById('loyaltyModalOverlay');
         const loyaltyModalClose = document.getElementById('loyaltyModalClose');
