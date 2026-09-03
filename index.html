@@ -1864,6 +1864,11 @@
             z-index: 3400;
         }
 
+        body.modal-open .order-fab,
+        body.modal-open .loyalty-fab {
+            z-index: 1500;
+        }
+
         .order-fab[hidden] { display: none; }
 
         .order-fab-badge {
@@ -4463,6 +4468,61 @@
         loyaltyModalOverlay.addEventListener('click', (e) => {
             if (e.target === loyaltyModalOverlay) loyaltyModalOverlay.classList.remove('active');
         });
+
+        // ============================================
+        // BLOQUEO DE SCROLL DE FONDO + BOTONES FLOTANTES DETRÁS
+        // Cada vez que se abre cualquier ventana emergente (ficha de
+        // producto, carrito, adicionales, cupón, mis pedidos, cuponera,
+        // login, elegir tipo de pedido...) se bloquea el scroll de la
+        // página de atrás, y los botones flotantes de regalo / mi pedido
+        // bajan de z-index para no tapar sus controles (como la "X").
+        // ============================================
+        (function () {
+            const hiddenBasedIds = ['authOverlay', 'orderTypeOverlay'];
+            const overlays = [
+                'productModalOverlay', 'cartOverlay', 'prepOverlay',
+                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
+                'orderModalOverlay', 'loyaltyModalOverlay',
+                ...hiddenBasedIds
+            ].map(id => document.getElementById(id)).filter(Boolean);
+
+            let savedScrollY = 0;
+
+            function isOverlayOpen(el) {
+                if (el.hasAttribute('hidden')) return false;
+                if (hiddenBasedIds.includes(el.id)) return true; // solo usan [hidden]
+                return el.classList.contains('active');
+            }
+
+            function refresh() {
+                const anyOpen = overlays.some(isOverlayOpen);
+                if (anyOpen) {
+                    if (document.body.style.position !== 'fixed') {
+                        savedScrollY = window.scrollY;
+                        document.body.style.position = 'fixed';
+                        document.body.style.top = (-savedScrollY) + 'px';
+                        document.body.style.left = '0';
+                        document.body.style.right = '0';
+                        document.body.style.width = '100%';
+                        document.body.classList.add('modal-open');
+                    }
+                } else if (document.body.style.position === 'fixed') {
+                    document.body.style.position = '';
+                    document.body.style.top = '';
+                    document.body.style.left = '';
+                    document.body.style.right = '';
+                    document.body.style.width = '';
+                    document.body.classList.remove('modal-open');
+                    window.scrollTo(0, savedScrollY);
+                }
+            }
+
+            const observer = new MutationObserver(refresh);
+            overlays.forEach(el => {
+                observer.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] });
+            });
+            refresh();
+        })();
     </script>
 </body>
 </html>
