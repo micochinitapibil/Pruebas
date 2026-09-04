@@ -3091,11 +3091,18 @@
                 .finally(() => { googleSignInBtn.disabled = false; });
         });
 
-        authGuestBtn.addEventListener('click', () => {
+        authGuestBtn.addEventListener('click', async () => {
             isGuest = true;
             authOverlay.setAttribute('hidden', '');
             updateUserUI(null);
             proceedToOrderType();
+            // Creamos la sesión anónima de una vez (no hasta que finalice su
+            // pedido): así, cuando arme su carrito, su uid ya existe y no
+            // hay riesgo de que se reinicie el carrito a la mitad del envío.
+            if (!auth.currentUser) {
+                try { await auth.signInAnonymously(); }
+                catch (err) { console.error('Error al crear sesión de invitado:', err); }
+            }
         });
 
         function updateUserUI(user) {
@@ -4104,14 +4111,21 @@
         async function sendDigitalOrder() {
             digitalOrderBtn.disabled = true;
             try {
+                // Capturamos el carrito y los adicionales ANTES de tocar la
+                // sesión (signInAnonymously puede disparar una limpieza de
+                // sesión si es la primera vez que se crea la cuenta de
+                // invitado) para que nada pueda vaciarlos a la mitad del envío.
+                const cartSnapshot = cart.slice();
+                const addonQuantitiesSnapshot = { ...addonQuantities };
+
                 if (!auth.currentUser) {
                     await auth.signInAnonymously();
                 }
 
-                const addonsChosen = ADDONS.filter(a => (addonQuantities[a.name] || 0) > 0);
+                const addonsChosen = ADDONS.filter(a => (addonQuantitiesSnapshot[a.name] || 0) > 0);
                 let addonsTotal = 0;
                 const addonsData = addonsChosen.map(a => {
-                    const qty = addonQuantities[a.name];
+                    const qty = addonQuantitiesSnapshot[a.name];
                     addonsTotal += a.price * qty;
                     return { name: a.name, qty, price: a.price };
                 });
@@ -4119,10 +4133,12 @@
                 const fee = getDeliveryFee();
                 const user = auth.currentUser;
 
-                const items = cart.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) }));
+                const items = cartSnapshot.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) }));
                 if (redeemedFreeItem) {
                     items.push({ name: redeemedFreeItem.name, qty: 1, price: 0, freeRedeemed: true });
                 }
+
+                const cartSubtotal = cartSnapshot.reduce((sum, c) => sum + parsePrice(c.price) * c.qty, 0);
 
                 const orderData = {
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -4131,9 +4147,9 @@
                     tableNumber: orderType === 'dine_in' ? tableNumber : null,
                     items: items,
                     addons: addonsData,
-                    subtotal: getCartSubtotal(),
+                    subtotal: cartSubtotal,
                     deliveryFee: fee,
-                    total: getCartTotal() + addonsTotal,
+                    total: cartSubtotal + addonsTotal + fee,
                     uid: user.uid,
                     customerEmail: user.isAnonymous ? null : user.email,
                     customerName: user.isAnonymous ? null : (user.displayName || null),
