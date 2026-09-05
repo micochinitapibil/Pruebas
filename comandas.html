@@ -208,6 +208,27 @@
         margin-bottom: 10px;
     }
 
+    .order-location-link {
+        display: inline-block;
+        background: #e8f3ff;
+        color: #1a6fd6;
+        font-size: 12.5px;
+        font-weight: 700;
+        padding: 6px 12px;
+        border-radius: 20px;
+        margin-bottom: 8px;
+        text-decoration: none;
+    }
+
+    .order-reference {
+        font-size: 12.5px;
+        color: var(--dark);
+        background: #f8f4e9;
+        padding: 6px 10px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
     .order-items {
         list-style: none;
         font-size: 13px;
@@ -460,6 +481,12 @@
                 `<li class="addon">+ ${a.qty}x ${a.name}</li>`
             ).join('');
             const customer = o.customerEmail || 'Invitado';
+            const locationHtml = (o.orderType === 'delivery' && o.deliveryLocation)
+                ? `<a class="order-location-link" href="https://maps.google.com/?q=${o.deliveryLocation.lat},${o.deliveryLocation.lng}" target="_blank" rel="noopener">📍 Ver ubicación de entrega</a>`
+                : '';
+            const referenceHtml = (o.orderType === 'delivery' && o.deliveryReference)
+                ? `<div class="order-reference">🏠 ${o.deliveryReference}</div>`
+                : '';
             const nextStatus = NEXT_STATUS[o.status];
             const btnHtml = nextStatus
                 ? `<button class="btn btn-primary order-advance-btn" data-id="${o.id}" data-next="${nextStatus}">${NEXT_LABEL[o.status]} →</button>`
@@ -472,6 +499,8 @@
                     <span class="order-time">${formatTime(o.createdAt)}</span>
                 </div>
                 <div class="order-service-tag">${serviceLabel(o)}</div>
+                ${locationHtml}
+                ${referenceHtml}
                 <ul class="order-items">${itemsHtml}${addonsHtml}</ul>
                 <div class="order-total">Total: ${formatMoney(o.total)}</div>
                 <div class="order-customer"><i class="fas fa-user"></i> ${customer}</div>
