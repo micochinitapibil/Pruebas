@@ -1848,7 +1848,7 @@
         .order-fab {
             position: fixed;
             right: 16px;
-            top: 190px;
+            top: 162px;
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -2005,7 +2005,7 @@
         .loyalty-fab {
             position: fixed;
             right: 16px;
-            top: 130px;
+            top: 120px;
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -3137,13 +3137,12 @@
 
         userLogoutBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (auth.currentUser) {
-                auth.signOut();
-            } else {
-                // Era invitado: solo recargamos para volver a mostrar el login
-                isGuest = false;
-                window.location.reload();
-            }
+            // Un invitado también tiene auth.currentUser (es una sesión anónima
+            // de Firebase), así que no sirve para distinguir "invitado" de
+            // "cuenta real". Se marca isGuest=false ANTES de signOut() para
+            // que onAuthStateChanged muestre el login en un solo paso.
+            isGuest = false;
+            auth.signOut();
         });
 
         auth.onAuthStateChanged(user => {
@@ -4326,7 +4325,7 @@
             });
         }
 
-        makeDraggable(orderFab, 'fabPos_order', 16, 190);
+        makeDraggable(orderFab, 'fabPos_order', 16, 162);
         let orderWatchUnsub = null;
         let myOrders = []; // TODO el historial del cliente (activos + entregados)
 
@@ -4419,7 +4418,7 @@
         // ============================================
         const loyaltyFab = document.getElementById('loyaltyFab');
         const loyaltyFabBadge = document.getElementById('loyaltyFabBadge');
-        makeDraggable(loyaltyFab, 'fabPos_loyalty', 16, 130);
+        makeDraggable(loyaltyFab, 'fabPos_loyalty', 16, 120);
 
         const loyaltyModalOverlay = document.getElementById('loyaltyModalOverlay');
         const loyaltyModalClose = document.getElementById('loyaltyModalClose');
