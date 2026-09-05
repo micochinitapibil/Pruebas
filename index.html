@@ -2512,10 +2512,6 @@
             gap: 6px;
         }
 
-        .delivery-location-step[hidden] {
-            display: none;
-        }
-
         .delivery-map {
             width: 100%;
             height: 220px;
@@ -2550,6 +2546,17 @@
             border-color: var(--primary);
         }
 
+        .delivery-phone-input {
+            width: 100%;
+            border: 2px solid rgba(138, 97, 22, 0.2);
+            border-radius: 12px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 14px;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+
         .delivery-reference-input {
             width: 100%;
             border: 2px solid rgba(138, 97, 22, 0.2);
@@ -2559,7 +2566,18 @@
             font-size: 14px;
             color: var(--dark);
             resize: vertical;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
+        }
+
+        .delivery-validation-msg {
+            font-size: 12.5px;
+            color: #c0392b;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .delivery-validation-msg[hidden] {
+            display: none;
         }
 
         .delivery-confirm-btn {
@@ -2691,22 +2709,29 @@
                     <i class="fas fa-arrow-left"></i> Regresar
                 </button>
             </div>
-
-            <div class="delivery-location-step" id="deliveryLocationStep" hidden>
-                <div class="order-type-subtitle">Confirma tu ubicación de entrega</div>
-                <div id="deliveryMap" class="delivery-map"></div>
-                <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
-                <button type="button" class="delivery-locate-btn" id="deliveryLocateBtn">
-                    <i class="fas fa-location-crosshairs"></i> Usar mi ubicación actual
-                </button>
-                <textarea id="deliveryReferenceInput" class="delivery-reference-input" rows="2" placeholder="Referencias: color de casa, entre calles, depto, etc."></textarea>
-                <button type="button" class="delivery-confirm-btn" id="deliveryConfirmBtn" disabled>Confirmar dirección</button>
-                <button type="button" class="table-back-btn" id="deliveryBackBtn">
-                    <i class="fas fa-arrow-left"></i> Regresar
-                </button>
-            </div>
         </div>
     </div>
+
+    <!-- VENTANA APARTE: confirmar ubicación de domicilio -->
+    <div class="order-type-overlay" id="deliveryLocationOverlay" hidden>
+        <div class="order-type-card delivery-location-step" id="deliveryLocationStep">
+            <h2>Confirma tu domicilio</h2>
+            <div class="order-type-subtitle">Ajusta el pin y completa tus datos de entrega</div>
+            <div id="deliveryMap" class="delivery-map"></div>
+            <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
+            <button type="button" class="delivery-locate-btn" id="deliveryLocateBtn">
+                <i class="fas fa-location-crosshairs"></i> Usar mi ubicación actual
+            </button>
+            <input type="tel" id="deliveryPhoneInput" class="delivery-phone-input" placeholder="Tu número de contacto *" maxlength="20">
+            <textarea id="deliveryReferenceInput" class="delivery-reference-input" rows="2" placeholder="Descripción del domicilio: color de casa, entre calles, depto, etc. *"></textarea>
+            <div class="delivery-validation-msg" id="deliveryValidationMsg" hidden>Falta tu número de contacto y/o la descripción del domicilio.</div>
+            <button type="button" class="delivery-confirm-btn" id="deliveryConfirmBtn">Confirmar dirección</button>
+            <button type="button" class="table-back-btn" id="deliveryBackBtn">
+                <i class="fas fa-arrow-left"></i> Regresar
+            </button>
+        </div>
+    </div>
+
 
     <!-- HEADER -->
     <header>
@@ -3322,14 +3347,14 @@
             orderTypeAsked = true;
             orderTypeOptions.hidden = false;
             tableSelect.hidden = true;
-            deliveryLocationStep.hidden = true;
+            deliveryLocationOverlay.setAttribute('hidden', '');
             orderTypeOverlay.removeAttribute('hidden');
         }
 
         function reopenOrderType() {
             orderTypeOptions.hidden = false;
             tableSelect.hidden = true;
-            deliveryLocationStep.hidden = true;
+            deliveryLocationOverlay.setAttribute('hidden', '');
             orderTypeOverlay.removeAttribute('hidden');
         }
 
@@ -3340,8 +3365,8 @@
                     orderTypeOptions.hidden = true;
                     tableSelect.hidden = false;
                 } else if (type === 'delivery') {
-                    orderTypeOptions.hidden = true;
-                    deliveryLocationStep.hidden = false;
+                    orderTypeOverlay.setAttribute('hidden', '');
+                    deliveryLocationOverlay.removeAttribute('hidden');
                     openDeliveryLocationStep();
                 } else {
                     finishOrderTypeSelection(type);
@@ -3355,24 +3380,29 @@
         });
 
         deliveryBackBtn.addEventListener('click', () => {
-            orderTypeOptions.hidden = false;
-            deliveryLocationStep.hidden = true;
+            deliveryLocationOverlay.setAttribute('hidden', '');
+            orderTypeOverlay.removeAttribute('hidden');
         });
 
         function finishOrderTypeSelection(type) {
             orderType = type;
             orderTypeOverlay.setAttribute('hidden', '');
+            deliveryLocationOverlay.setAttribute('hidden', '');
             updateServiceUI();
             if (typeof renderCart === 'function') renderCart();
         }
 
         // ============================================
         // MAPA DE UBICACIÓN PARA DOMICILIO (Leaflet + OpenStreetMap, sin costo)
+        // Ventana aparte del selector de tipo de pedido, con teléfono y
+        // descripción de domicilio obligatorios.
         // ============================================
-        const deliveryLocationStep = document.getElementById('deliveryLocationStep');
+        const deliveryLocationOverlay = document.getElementById('deliveryLocationOverlay');
         const deliveryMapHint = document.getElementById('deliveryMapHint');
         const deliveryLocateBtn = document.getElementById('deliveryLocateBtn');
+        const deliveryPhoneInput = document.getElementById('deliveryPhoneInput');
         const deliveryReferenceInput = document.getElementById('deliveryReferenceInput');
+        const deliveryValidationMsg = document.getElementById('deliveryValidationMsg');
         const deliveryConfirmBtn = document.getElementById('deliveryConfirmBtn');
 
         // Coordenadas del local (mismas del mapa de "Ubicación" que ya tienes),
@@ -3385,13 +3415,15 @@
         let deliveryLat = null;
         let deliveryLng = null;
         let deliveryReference = '';
+        let deliveryPhone = '';
+        let deliveryLocationPicked = false; // ya tenemos un punto en el mapa (GPS o arrastrado)
 
         function setDeliveryPosition(lat, lng, zoom) {
             deliveryLat = lat;
             deliveryLng = lng;
+            deliveryLocationPicked = true;
             deliveryMap.setView([lat, lng], zoom || deliveryMap.getZoom() || 16);
             deliveryMarker.setLatLng([lat, lng]);
-            deliveryConfirmBtn.disabled = false;
         }
 
         function locateDelivery() {
@@ -3415,7 +3447,6 @@
         }
 
         function openDeliveryLocationStep() {
-            deliveryConfirmBtn.disabled = true;
             if (!deliveryMap) {
                 deliveryMap = L.map('deliveryMap').setView([STORE_LAT, STORE_LNG], 13);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -3427,8 +3458,8 @@
                     const pos = deliveryMarker.getLatLng();
                     deliveryLat = pos.lat;
                     deliveryLng = pos.lng;
+                    deliveryLocationPicked = true;
                     deliveryMapHint.textContent = 'Ubicación ajustada manualmente.';
-                    deliveryConfirmBtn.disabled = false;
                 });
             }
             // El mapa estaba oculto (display:none), Leaflet necesita que le
@@ -3440,7 +3471,15 @@
         deliveryLocateBtn.addEventListener('click', locateDelivery);
 
         deliveryConfirmBtn.addEventListener('click', () => {
+            deliveryPhone = deliveryPhoneInput.value.trim();
             deliveryReference = deliveryReferenceInput.value.trim();
+            if (!deliveryPhone || !deliveryReference || !deliveryLocationPicked) {
+                deliveryValidationMsg.removeAttribute('hidden');
+                if (!deliveryPhone) deliveryPhoneInput.focus();
+                else if (!deliveryReference) deliveryReferenceInput.focus();
+                return;
+            }
+            deliveryValidationMsg.setAttribute('hidden', '');
             finishOrderTypeSelection('delivery');
         });
 
@@ -4169,6 +4208,9 @@
                 if (deliveryReference) {
                     message += `\n🏠 Referencias: ${deliveryReference}`;
                 }
+                if (deliveryPhone) {
+                    message += `\n📞 Contacto: ${deliveryPhone}`;
+                }
             }
 
             const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
@@ -4340,6 +4382,7 @@
                     deliveryFee: fee,
                     deliveryLocation: (orderType === 'delivery' && deliveryLat != null) ? { lat: deliveryLat, lng: deliveryLng } : null,
                     deliveryReference: orderType === 'delivery' ? (deliveryReference || null) : null,
+                    deliveryPhone: orderType === 'delivery' ? (deliveryPhone || null) : null,
                     total: cartSubtotal + addonsTotal + fee,
                     uid: user.uid,
                     customerEmail: user.isAnonymous ? null : user.email,
