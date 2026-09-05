@@ -1891,6 +1891,8 @@
             animation: orderFabPulse 1.6s ease-in-out infinite;
         }
 
+        .order-fab-badge[hidden] { display: none; }
+
         @keyframes orderFabPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.12); }
@@ -1900,6 +1902,13 @@
             font-size: 12px;
             color: #999;
             margin-top: -8px !important;
+        }
+
+        .order-list-empty {
+            font-size: 13.5px;
+            color: #999;
+            text-align: center;
+            padding: 24px 10px;
         }
 
         .order-list {
@@ -2941,7 +2950,7 @@
     <!-- BOTÓN FLOTANTE: MI PEDIDO (arriba del botón de cuponera) -->
     <button type="button" class="order-fab" id="orderFab" aria-label="Ver mi pedido" hidden>
         📋
-        <span class="order-fab-badge" id="orderFabBadge"></span>
+        <span class="order-fab-badge" id="orderFabBadge" hidden></span>
     </button>
 
     <!-- MODAL: MIS PEDIDOS EN CURSO -->
@@ -2949,7 +2958,7 @@
         <div class="loyalty-modal">
             <button class="loyalty-modal-close" id="orderModalClose" aria-label="Cerrar">&times;</button>
             <div class="loyalty-modal-icon">📋</div>
-            <h3>Tus pedidos en curso</h3>
+            <h3>Tus pedidos</h3>
             <p class="order-list-hint">Desliza hacia abajo para ver todos</p>
 
             <div class="order-list" id="orderList"><!-- generado por JS --></div>
@@ -4319,7 +4328,7 @@
 
         makeDraggable(orderFab, 'fabPos_order', 16, 190);
         let orderWatchUnsub = null;
-        let activeOrders = [];
+        let myOrders = []; // TODO el historial del cliente (activos + entregados)
 
         function formatOrderTime(ts) {
             if (!ts || !ts.toDate) return 'hace un momento';
@@ -4327,7 +4336,11 @@
         }
 
         function renderOrderList() {
-            orderListEl.innerHTML = activeOrders.map(o => {
+            if (myOrders.length === 0) {
+                orderListEl.innerHTML = '<p class="order-list-empty">Todavía no tienes pedidos. ¡Anímate a hacer el primero! 🐷</p>';
+                return;
+            }
+            orderListEl.innerHTML = myOrders.map(o => {
                 const status = o.status || 'nuevo';
                 const info = ORDER_STATUS_INFO[status] || ORDER_STATUS_INFO.nuevo;
                 const currentIdx = ORDER_STEPS.indexOf(status);
@@ -4365,34 +4378,32 @@
         }
 
         function renderOrderFab() {
-            if (activeOrders.length === 0) {
-                orderFab.setAttribute('hidden', '');
-                orderModalOverlay.classList.remove('active');
-                return;
-            }
-            orderFab.removeAttribute('hidden');
-            orderFabBadge.textContent = activeOrders.length;
+            const activeCount = myOrders.filter(o => o.status !== 'entregado').length;
+            orderFabBadge.hidden = activeCount === 0;
+            orderFabBadge.textContent = activeCount;
             renderOrderList();
         }
 
         function watchMyOrders(uid) {
             if (orderWatchUnsub) orderWatchUnsub();
+            orderFab.removeAttribute('hidden'); // visible en cuanto sabemos quién es (invitado o logueado)
             orderWatchUnsub = db.collection('comandas').where('uid', '==', uid)
                 .onSnapshot(snapshot => {
-                    activeOrders = [];
+                    myOrders = [];
                     snapshot.forEach(doc => {
-                        const d = doc.data();
-                        if (d.status !== 'entregado') activeOrders.push({ id: doc.id, ...d });
+                        myOrders.push({ id: doc.id, ...doc.data() });
                     });
-                    // Más reciente primero
-                    activeOrders.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+                    // Más reciente primero (incluye entregados, para ver su historial)
+                    myOrders.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
                     renderOrderFab();
                 }, err => console.error('Error viendo mis pedidos:', err));
         }
 
         function stopWatchingMyOrders() {
             if (orderWatchUnsub) { orderWatchUnsub(); orderWatchUnsub = null; }
-            activeOrders = [];
+            myOrders = [];
+            orderFab.setAttribute('hidden', '');
+            orderModalOverlay.classList.remove('active');
             renderOrderFab();
         }
 
