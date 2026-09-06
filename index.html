@@ -1970,6 +1970,13 @@
         .order-item-progress .seg.done { background: var(--primary); }
         .order-item-progress .seg.current { background: var(--secondary); }
 
+        .order-item-breakdown {
+            font-size: 11.5px;
+            color: #8a7554;
+            text-align: right;
+            margin-bottom: 2px;
+        }
+
         .order-item-total {
             font-size: 12.5px;
             color: #666;
@@ -4581,10 +4588,19 @@
                 const dishesHtml = (o.items || []).map(i =>
                     i.freeRedeemed
                         ? `<li class="free-dish">🎁 ${i.qty}x ${i.name} — Gratis</li>`
-                        : `<li>${i.qty}x ${i.name}</li>`
+                        : `<li>${i.qty}x ${i.name} — ${formatPrice(i.price)}</li>`
                 ).join('') + (o.addons || []).map(a =>
-                    `<li class="addon-dish">+ ${a.qty}x ${a.name}</li>`
+                    `<li class="addon-dish">+ ${a.qty}x ${a.name} — ${formatPrice(a.price)}</li>`
                 ).join('');
+
+                const addonsTotal = (o.addons || []).reduce((sum, a) => sum + (a.price * a.qty), 0);
+                const breakdownParts = [];
+                if (typeof o.subtotal === 'number') breakdownParts.push(`Subtotal: ${formatPrice(o.subtotal)}`);
+                if (addonsTotal > 0) breakdownParts.push(`Adicionales: ${formatPrice(addonsTotal)}`);
+                if (o.orderType === 'delivery' && o.deliveryFee) breakdownParts.push(`Envío: ${formatPrice(o.deliveryFee)}`);
+                const breakdownHtml = breakdownParts.length
+                    ? `<div class="order-item-breakdown">${breakdownParts.join(' · ')}</div>`
+                    : '';
 
                 return `
                 <div class="order-item-card">
@@ -4597,6 +4613,7 @@
                     </div>
                     ${dishesHtml ? `<ul class="order-item-dishes">${dishesHtml}</ul>` : ''}
                     <div class="order-item-progress">${segsHtml}</div>
+                    ${breakdownHtml}
                     <div class="order-item-total">${typeof o.total === 'number' ? 'Total: ' + formatPrice(o.total) : ''}</div>
                 </div>`;
             }).join('');

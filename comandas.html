@@ -262,6 +262,12 @@
     }
     .order-items li.addon { color: var(--secondary); font-size: 12px; }
 
+    .order-breakdown {
+        font-size: 11.5px;
+        color: #8a7554;
+        margin-bottom: 4px;
+    }
+
     .order-total {
         font-weight: 800;
         color: var(--dark);
@@ -515,8 +521,16 @@
                     : `<li>${i.qty}x ${i.name} — ${formatMoney(i.price)}</li>`
             ).join('');
             const addonsHtml = (o.addons || []).map(a =>
-                `<li class="addon">+ ${a.qty}x ${a.name}</li>`
+                `<li class="addon">+ ${a.qty}x ${a.name} — ${formatMoney(a.price)}</li>`
             ).join('');
+            const addonsTotal = (o.addons || []).reduce((sum, a) => sum + (a.price * a.qty), 0);
+            const breakdownParts = [];
+            if (typeof o.subtotal === 'number') breakdownParts.push(`Subtotal: ${formatMoney(o.subtotal)}`);
+            if (addonsTotal > 0) breakdownParts.push(`Adicionales: ${formatMoney(addonsTotal)}`);
+            if (o.orderType === 'delivery' && o.deliveryFee) breakdownParts.push(`Envío: ${formatMoney(o.deliveryFee)}`);
+            const breakdownHtml = breakdownParts.length
+                ? `<div class="order-breakdown">${breakdownParts.join(' · ')}</div>`
+                : '';
             const customer = o.customerEmail || 'Invitado';
             const locationHtml = (o.orderType === 'delivery' && o.deliveryLocation)
                 ? `<a class="order-location-link" href="https://maps.google.com/?q=${o.deliveryLocation.lat},${o.deliveryLocation.lng}" target="_blank" rel="noopener">📍 Ver ubicación de entrega</a>`
@@ -547,6 +561,7 @@
                 ${phoneHtml}
                 ${riderHtml}
                 <ul class="order-items">${itemsHtml}${addonsHtml}</ul>
+                ${breakdownHtml}
                 <div class="order-total">Total: ${formatMoney(o.total)}</div>
                 <div class="order-customer"><i class="fas fa-user"></i> ${customer}</div>
                 <div class="order-status-badge status-${o.status}">${STATUS_LABELS[o.status] || o.status}</div>
