@@ -241,6 +241,24 @@
         text-decoration: none;
     }
 
+    .order-rider-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        background: #25D366;
+        color: white;
+        font-size: 14px;
+        font-weight: 700;
+        padding: 11px;
+        border-radius: 10px;
+        margin-top: 10px;
+        margin-bottom: 8px;
+        text-decoration: none;
+        box-sizing: border-box;
+    }
+
     .order-items {
         list-style: none;
         font-size: 13px;
@@ -439,6 +457,19 @@
         return '🏪 Recoger en el local';
     }
 
+    // Arma el mensaje de WhatsApp con los datos de entrega para pasárselo
+    // al repartidor (se abre sin número fijo, para elegir el contacto).
+    function buildRiderWhatsAppUrl(o) {
+        const itemsText = (o.items || []).map(i => `${i.qty}x ${i.name}`).join(', ');
+        let msg = `Pedido #${o.id.slice(-6).toUpperCase()} - A domicilio\n`;
+        msg += `🍽️ ${itemsText}\n`;
+        msg += `💰 Total a cobrar: ${formatMoney(o.total)}\n`;
+        if (o.deliveryPhone) msg += `📞 Contacto del cliente: ${o.deliveryPhone}\n`;
+        if (o.deliveryReference) msg += `🏠 Referencias: ${o.deliveryReference}\n`;
+        if (o.deliveryLocation) msg += `📍 Ubicación: https://maps.google.com/?q=${o.deliveryLocation.lat},${o.deliveryLocation.lng}`;
+        return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    }
+
     // ==================================================
     // CARGA Y RENDER DE COMANDAS
     // ==================================================
@@ -502,6 +533,9 @@
             const phoneHtml = (o.orderType === 'delivery' && o.deliveryPhone)
                 ? `<a class="order-phone-link" href="tel:${o.deliveryPhone}">📞 ${o.deliveryPhone}</a>`
                 : '';
+            const riderHtml = (o.orderType === 'delivery')
+                ? `<a class="order-rider-btn" href="${buildRiderWhatsAppUrl(o)}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Enviar datos al repartidor</a>`
+                : '';
             const nextStatus = NEXT_STATUS[o.status];
             const btnHtml = nextStatus
                 ? `<button class="btn btn-primary order-advance-btn" data-id="${o.id}" data-next="${nextStatus}">${NEXT_LABEL[o.status]} →</button>`
@@ -521,6 +555,7 @@
                 <div class="order-total">Total: ${formatMoney(o.total)}</div>
                 <div class="order-customer"><i class="fas fa-user"></i> ${customer}</div>
                 <div class="order-status-badge status-${o.status}">${STATUS_LABELS[o.status] || o.status}</div>
+                ${riderHtml}
                 ${btnHtml}
             </div>`;
         }).join('');
