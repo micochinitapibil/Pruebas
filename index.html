@@ -2167,53 +2167,6 @@
         /* ============================================
            LOGIN DE CLIENTES
            ============================================ */
-        .auth-overlay {
-            position: fixed;
-            inset: 0;
-            background: linear-gradient(135deg, #241B10 0%, #5c3d10 60%, #8A6116 100%);
-            z-index: 5000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .auth-overlay[hidden] {
-            display: none;
-        }
-
-        .auth-card {
-            background: #FBF0D6;
-            border-radius: 24px;
-            max-width: 380px;
-            width: 100%;
-            max-height: 92vh;
-            overflow-y: auto;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
-            padding: 32px 28px;
-            text-align: center;
-            animation: fadeInUp 0.5s ease;
-        }
-
-        .auth-card img {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 8px;
-        }
-
-        .auth-card h2 {
-            font-size: 22px;
-            color: var(--accent);
-            font-weight: 800;
-            margin-bottom: 4px;
-        }
-
-        .auth-card .auth-subtitle {
-            font-size: 14px;
-            color: #6b5a3e;
-            margin-bottom: 22px;
-        }
-
         .auth-error {
             display: none;
             background: #fdecea;
@@ -2251,42 +2204,6 @@
         .google-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-        }
-
-        .auth-divider {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 20px 0 16px;
-            color: #a3906a;
-            font-size: 12px;
-        }
-
-        .auth-divider::before,
-        .auth-divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: rgba(138, 97, 22, 0.25);
-        }
-
-        .auth-guest-btn {
-            width: 100%;
-            background: transparent;
-            border: 2px solid var(--secondary);
-            color: var(--secondary);
-            padding: 12px;
-            border-radius: 10px;
-            font-family: inherit;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.25s ease;
-        }
-
-        .auth-guest-btn:hover {
-            background: var(--secondary);
-            color: white;
         }
 
         /* Indicador de cuenta en el header */
@@ -2669,31 +2586,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
-    <!-- LOGIN DE CLIENTES -->
-    <div class="auth-overlay" id="authOverlay">
-        <div class="auth-card">
-            <img src="./logo.png" alt="Mi Cochinita Pibil">
-            <h2>Mi Cochinita Pibil</h2>
-            <div class="auth-subtitle">Inicia sesión para continuar</div>
-
-            <div class="auth-error" id="authError"></div>
-
-            <button type="button" class="google-btn" id="googleSignInBtn">
-                <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
-                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-                </svg>
-                Continuar con Google
-            </button>
-
-            <div class="auth-divider">o</div>
-
-            <button type="button" class="auth-guest-btn" id="authGuestBtn">Continuar como invitado</button>
-        </div>
-    </div>
-
     <!-- TIPO DE PEDIDO (domicilio / recoger / comer aquí) -->
     <div class="order-type-overlay" id="orderTypeOverlay" hidden>
         <div class="order-type-card">
@@ -3106,8 +2998,19 @@
 
             <!-- Vista para invitados / no logueados -->
             <div id="loyaltyGuestView">
-                <p>Inicia sesión con tu cuenta (no como invitado) para empezar a acumular tus pedidos.</p>
-                <p class="loyalty-rule" id="loyaltyGuestRule">Cada <strong>7</strong> pedidos entregados, ¡el siguiente platillo va por la casa!</p>
+                <p>¿Quieres participar por un platillo gratis? Cada <strong id="loyaltyGuestThreshold">7</strong> pedidos entregados, ¡el siguiente va por la casa! Para empezar a acumular, inicia sesión con tu cuenta de Google.</p>
+
+                <div class="auth-error" id="authError"></div>
+
+                <button type="button" class="google-btn" id="googleSignInBtn">
+                    <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+                        <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                        <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                        <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                        <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                    </svg>
+                    Continuar con Google
+                </button>
             </div>
 
             <!-- Vista para clientes logueados -->
@@ -3179,16 +3082,14 @@
         const configRef = db.collection('config').doc('general');
 
         // ============================================
-        // LOGIN DE CLIENTES
+        // SESIÓN DE CLIENTES (invitado automático; Google solo desde la cuponera)
         // ============================================
         let isGuest = false;
         let lastSessionKey; // undefined = aún no se resuelve la sesión inicial; luego 'user:<uid>' | 'anon:<uid>' | null
         const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-        const authOverlay = document.getElementById('authOverlay');
         const authError = document.getElementById('authError');
         const googleSignInBtn = document.getElementById('googleSignInBtn');
-        const authGuestBtn = document.getElementById('authGuestBtn');
 
         const userBtn = document.getElementById('userBtn');
         const userBtnLabel = document.getElementById('userBtnLabel');
@@ -3219,25 +3120,12 @@
             authError.style.display = 'none';
             googleSignInBtn.disabled = true;
             auth.signInWithPopup(googleProvider)
+                .then(() => { loyaltyModalOverlay.classList.remove('active'); })
                 .catch(err => {
                     const message = friendlyAuthError(err);
                     if (message) showAuthError(message);
                 })
                 .finally(() => { googleSignInBtn.disabled = false; });
-        });
-
-        authGuestBtn.addEventListener('click', async () => {
-            isGuest = true;
-            authOverlay.setAttribute('hidden', '');
-            updateUserUI(null);
-            proceedToOrderType();
-            // Creamos la sesión anónima de una vez (no hasta que finalice su
-            // pedido): así, cuando arme su carrito, su uid ya existe y no
-            // hay riesgo de que se reinicie el carrito a la mitad del envío.
-            if (!auth.currentUser) {
-                try { await auth.signInAnonymously(); }
-                catch (err) { console.error('Error al crear sesión de invitado:', err); }
-            }
         });
 
         function updateUserUI(user) {
@@ -3266,7 +3154,8 @@
             // Un invitado también tiene auth.currentUser (es una sesión anónima
             // de Firebase), así que no sirve para distinguir "invitado" de
             // "cuenta real". Se marca isGuest=false ANTES de signOut() para
-            // que onAuthStateChanged muestre el login en un solo paso.
+            // que onAuthStateChanged cree una nueva sesión de invitado en un
+            // solo paso (ya no hay overlay de login que mostrar).
             isGuest = false;
             auth.signOut();
         });
@@ -3276,7 +3165,6 @@
                 if (lastSessionKey !== undefined && lastSessionKey !== 'user:' + user.uid) resetSessionState();
                 lastSessionKey = 'user:' + user.uid;
                 isGuest = false;
-                authOverlay.setAttribute('hidden', '');
                 updateUserUI(user);
                 proceedToOrderType();
                 startLoyaltyTracking(user.uid);
@@ -3286,7 +3174,6 @@
                 if (lastSessionKey !== undefined && lastSessionKey !== 'anon:' + user.uid) resetSessionState();
                 lastSessionKey = 'anon:' + user.uid;
                 isGuest = true;
-                authOverlay.setAttribute('hidden', '');
                 updateUserUI(null);
                 proceedToOrderType();
                 showLoyaltyGuestView();
@@ -3295,11 +3182,17 @@
                 updateUserUI(null);
                 showLoyaltyGuestView();
             } else {
+                // Nadie ha iniciado sesión todavía: en vez de forzar una pantalla
+                // de login, entramos como invitado automáticamente y de una vez
+                // dejamos que elija cómo quiere su pedido. Solo si más adelante
+                // quiere participar en la cuponera le pedimos Google, desde ahí.
                 if (lastSessionKey !== undefined && lastSessionKey !== null) resetSessionState();
                 lastSessionKey = null;
-                authOverlay.removeAttribute('hidden');
+                isGuest = true;
                 updateUserUI(null);
+                proceedToOrderType();
                 showLoyaltyGuestView();
+                auth.signInAnonymously().catch(err => console.error('Error al crear sesión de invitado:', err));
             }
         });
 
@@ -4677,7 +4570,7 @@
         const loyaltyModalClose = document.getElementById('loyaltyModalClose');
         const loyaltyGuestView = document.getElementById('loyaltyGuestView');
         const loyaltyUserView = document.getElementById('loyaltyUserView');
-        const loyaltyGuestRule = document.getElementById('loyaltyGuestRule');
+        const loyaltyGuestThreshold = document.getElementById('loyaltyGuestThreshold');
         const loyaltyUserRule = document.getElementById('loyaltyUserRule');
         const loyaltyProgressFill = document.getElementById('loyaltyProgressFill');
         const loyaltyProgressText = document.getElementById('loyaltyProgressText');
@@ -4703,7 +4596,7 @@
         }
 
         function updateLoyaltyThresholdUI() {
-            loyaltyGuestRule.innerHTML = `Cada <strong>${LOYALTY_THRESHOLD}</strong> pedidos entregados, ¡el siguiente platillo va por la casa!`;
+            loyaltyGuestThreshold.textContent = LOYALTY_THRESHOLD;
             loyaltyUserRule.innerHTML = `Cada <strong>${LOYALTY_THRESHOLD}</strong> pedidos entregados ganas un platillo totalmente gratis.`;
         }
 
@@ -4757,7 +4650,7 @@
         // bajan de z-index para no tapar sus controles (como la "X").
         // ============================================
         (function () {
-            const hiddenBasedIds = ['authOverlay', 'orderTypeOverlay'];
+            const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay',
                 'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
