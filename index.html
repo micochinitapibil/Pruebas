@@ -1737,6 +1737,10 @@
             color: var(--dark);
         }
 
+        .cart-service-summary[hidden] {
+            display: none;
+        }
+
         .cart-service-summary i {
             color: var(--primary);
             font-size: 15px;
@@ -3166,7 +3170,6 @@
                 lastSessionKey = 'user:' + user.uid;
                 isGuest = false;
                 updateUserUI(user);
-                proceedToOrderType();
                 startLoyaltyTracking(user.uid);
                 watchMyOrders(user.uid);
             } else if (user && user.isAnonymous) {
@@ -3175,7 +3178,6 @@
                 lastSessionKey = 'anon:' + user.uid;
                 isGuest = true;
                 updateUserUI(null);
-                proceedToOrderType();
                 showLoyaltyGuestView();
                 watchMyOrders(user.uid);
             } else if (isGuest) {
@@ -3183,14 +3185,14 @@
                 showLoyaltyGuestView();
             } else {
                 // Nadie ha iniciado sesión todavía: en vez de forzar una pantalla
-                // de login, entramos como invitado automáticamente y de una vez
-                // dejamos que elija cómo quiere su pedido. Solo si más adelante
-                // quiere participar en la cuponera le pedimos Google, desde ahí.
+                // de login, entramos como invitado automáticamente y lo dejamos
+                // navegar el menú libremente. La pregunta de a domicilio/mesa/
+                // recoger ya no se hace aquí: se pregunta hasta que abra el
+                // carrito con productos adentro (ver cartBtn más abajo).
                 if (lastSessionKey !== undefined && lastSessionKey !== null) resetSessionState();
                 lastSessionKey = null;
                 isGuest = true;
                 updateUserUI(null);
-                proceedToOrderType();
                 showLoyaltyGuestView();
                 auth.signInAnonymously().catch(err => console.error('Error al crear sesión de invitado:', err));
             }
@@ -3203,7 +3205,7 @@
 
         let orderType = null;       // 'delivery' | 'pickup' | 'dine_in'
         let tableNumber = null;     // solo si orderType === 'dine_in'
-        let orderTypeAsked = false; // para no mostrarla más de una vez por carga de página
+        let pendingCartOpen = false; // true cuando la pregunta se disparó desde el carrito, para abrirlo justo después de elegir
 
         const orderTypeOverlay = document.getElementById('orderTypeOverlay');
         const orderTypeOptions = document.getElementById('orderTypeOptions');
@@ -3251,15 +3253,6 @@
             }
         }, err => console.error('Error leyendo configuración:', err));
 
-        function proceedToOrderType() {
-            if (orderTypeAsked) return;
-            orderTypeAsked = true;
-            orderTypeOptions.hidden = false;
-            tableSelect.hidden = true;
-            deliveryLocationOverlay.setAttribute('hidden', '');
-            orderTypeOverlay.removeAttribute('hidden');
-        }
-
         function reopenOrderType() {
             orderTypeOptions.hidden = false;
             tableSelect.hidden = true;
@@ -3299,6 +3292,10 @@
             deliveryLocationOverlay.setAttribute('hidden', '');
             updateServiceUI();
             if (typeof renderCart === 'function') renderCart();
+            if (pendingCartOpen) {
+                pendingCartOpen = false;
+                if (typeof openCart === 'function') openCart();
+            }
         }
 
         // ============================================
@@ -3933,6 +3930,7 @@
         }
 
         function renderCart() {
+            document.getElementById('cartServiceSummary').hidden = (orderType === null);
             if (cart.length === 0) {
                 cartItemsEl.innerHTML = '<div class="cart-empty">Tu carrito está vacío 🐷<br>Agrega algo delicioso del menú.</div>';
                 checkoutBtn.disabled = true;
@@ -3980,7 +3978,14 @@
             cartOverlay.classList.remove('active');
         }
 
-        cartBtn.addEventListener('click', openCart);
+        cartBtn.addEventListener('click', () => {
+            if (cart.length > 0 && orderType === null) {
+                pendingCartOpen = true;
+                reopenOrderType();
+            } else {
+                openCart();
+            }
+        });
         cartClose.addEventListener('click', closeCart);
         cartOverlay.addEventListener('click', (e) => {
             if (e.target === cartOverlay) closeCart();
@@ -4585,7 +4590,7 @@
         function resetSessionState() {
             orderType = null;
             tableNumber = null;
-            orderTypeAsked = false;
+            pendingCartOpen = false;
             cart = [];
             if (typeof updateCartBadge === 'function') updateCartBadge();
             if (typeof renderCart === 'function') renderCart();
