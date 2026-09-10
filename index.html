@@ -1885,15 +1885,15 @@
             z-index: 3300;
             display: flex;
             align-items: center;
-            gap: 7px;
-            background: rgba(36, 27, 16, 0.94);
-            color: #FBF0D6;
+            gap: 9px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
             border: none;
-            padding: 9px 16px;
-            border-radius: 30px;
+            padding: 13px 20px;
+            border-radius: 16px;
             font-family: inherit;
-            font-size: 12.5px;
-            font-weight: 700;
+            font-size: 14px;
+            font-weight: 800;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
             cursor: pointer;
             opacity: 0;
@@ -1909,8 +1909,8 @@
         }
 
         .cart-toast i {
-            font-size: 12px;
-            color: var(--primary);
+            font-size: 15px;
+            color: white;
         }
 
         body.modal-open .cart-toast {
@@ -2520,6 +2520,7 @@
             background: #FBF0D6;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
         }
 
         .delivery-fullscreen[hidden] {
@@ -2566,14 +2567,9 @@
 
         .delivery-map-wrap {
             position: relative;
-            flex: 0.65 1 0%;
+            flex: 0 0 auto;
+            height: 42vh;
             min-height: 0;
-        }
-
-        .delivery-map-spacer {
-            flex: 0.35 1 0%;
-            min-height: 0;
-            background: #FBF0D6;
         }
 
         .delivery-map-full {
@@ -2618,6 +2614,7 @@
 
         .delivery-form-sheet {
             flex-shrink: 0;
+            margin-top: 10px;
             background: #FBF0D6;
             padding: 16px 18px calc(16px + env(safe-area-inset-bottom, 0px));
             box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.1);
@@ -2792,7 +2789,6 @@
                 <i class="fas fa-location-crosshairs"></i> Localízame
             </button>
         </div>
-        <div class="delivery-map-spacer"></div>
 
         <div class="delivery-form-sheet" id="deliveryLocationStep">
             <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
