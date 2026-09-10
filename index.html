@@ -2358,7 +2358,9 @@
         .order-type-overlay {
             position: fixed;
             inset: 0;
-            background: linear-gradient(135deg, #241B10 0%, #5c3d10 60%, #8A6116 100%);
+            background: rgba(36, 27, 16, 0.65);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 4500;
             display: flex;
             align-items: center;
@@ -2371,6 +2373,7 @@
         }
 
         .order-type-card {
+            position: relative;
             background: #FBF0D6;
             border-radius: 24px;
             max-width: 420px;
@@ -2381,6 +2384,24 @@
             padding: 32px 26px;
             text-align: center;
             animation: fadeInUp 0.5s ease;
+        }
+
+        .order-type-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: none;
+            background: var(--light);
+            color: var(--dark);
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .order-type-card h2 {
@@ -2545,14 +2566,31 @@
 
         .delivery-map-wrap {
             position: relative;
-            flex: 1 1 auto;
+            flex: 0.65 1 0%;
             min-height: 0;
+        }
+
+        .delivery-map-spacer {
+            flex: 0.35 1 0%;
+            min-height: 0;
+            background: #FBF0D6;
         }
 
         .delivery-map-full {
             width: 100%;
             height: 100%;
             background: #eee;
+        }
+
+        @keyframes deliveryLocatePulse {
+            0%, 100% {
+                transform: translateX(-50%) scale(1);
+                box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+            }
+            50% {
+                transform: translateX(-50%) scale(1.06);
+                box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
+            }
         }
 
         .delivery-locate-pill {
@@ -2575,6 +2613,7 @@
             white-space: nowrap;
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
             cursor: pointer;
+            animation: deliveryLocatePulse 1.8s ease-in-out infinite;
         }
 
         .delivery-form-sheet {
@@ -2702,6 +2741,7 @@
     <!-- TIPO DE PEDIDO (domicilio / recoger / comer aquí) -->
     <div class="order-type-overlay" id="orderTypeOverlay" hidden>
         <div class="order-type-card">
+            <button type="button" class="order-type-close" id="orderTypeCloseBtn" aria-label="Cerrar">&times;</button>
             <h2>¿Cómo quieres tu pedido?</h2>
             <div class="order-type-subtitle">Elige una opción para continuar</div>
 
@@ -2720,6 +2760,9 @@
                     <i class="fas fa-utensils"></i>
                     <span>Comer aquí</span>
                     <small>Elige tu mesa</small>
+                </button>
+                <button type="button" class="table-back-btn" id="orderTypeBackBtn">
+                    <i class="fas fa-arrow-left"></i> Regresar
                 </button>
             </div>
 
@@ -2749,6 +2792,7 @@
                 <i class="fas fa-location-crosshairs"></i> Localízame
             </button>
         </div>
+        <div class="delivery-map-spacer"></div>
 
         <div class="delivery-form-sheet" id="deliveryLocationStep">
             <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
@@ -3331,6 +3375,8 @@
 
         const orderTypeOverlay = document.getElementById('orderTypeOverlay');
         const orderTypeOptions = document.getElementById('orderTypeOptions');
+        const orderTypeCloseBtn = document.getElementById('orderTypeCloseBtn');
+        const orderTypeBackBtn = document.getElementById('orderTypeBackBtn');
         const tableSelect = document.getElementById('tableSelect');
         const tableGrid = document.getElementById('tableGrid');
         const tableBackBtn = document.getElementById('tableBackBtn');
@@ -3407,6 +3453,17 @@
             deliveryLocationOverlay.setAttribute('hidden', '');
             orderTypeOverlay.removeAttribute('hidden');
         });
+
+        // Cancela la pregunta de tipo de pedido (X arriba o "Regresar" abajo):
+        // la cierra y, si se había disparado desde "Finalizar pedido", no deja
+        // esa bandera pendiente para la próxima vez.
+        function cancelOrderType() {
+            orderTypeOverlay.setAttribute('hidden', '');
+            pendingOrderTypeThenCheckout = false;
+        }
+
+        orderTypeCloseBtn.addEventListener('click', cancelOrderType);
+        orderTypeBackBtn.addEventListener('click', cancelOrderType);
 
         function finishOrderTypeSelection(type) {
             orderType = type;
