@@ -1877,6 +1877,46 @@
 
         .order-fab[hidden] { display: none; }
 
+        /* Aviso flotante y sutil del carrito (abajo a la derecha) */
+        .cart-toast {
+            position: fixed;
+            right: 16px;
+            bottom: 18px;
+            z-index: 3300;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(36, 27, 16, 0.94);
+            color: #FBF0D6;
+            border: none;
+            padding: 9px 16px;
+            border-radius: 30px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 700;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(18px);
+            pointer-events: none;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+
+        .cart-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .cart-toast i {
+            font-size: 12px;
+            color: var(--primary);
+        }
+
+        body.modal-open .cart-toast {
+            z-index: 1500;
+        }
+
         .order-fab-badge {
             position: absolute;
             top: -4px;
@@ -2449,38 +2489,106 @@
             gap: 6px;
         }
 
-        .delivery-map {
+        /* Ventana de domicilio: pantalla completa, mapa grande, botón
+           flotante de localizar (estilo apps de delivery tipo KFC), con
+           los colores de Cochinita Pibil. */
+        .delivery-fullscreen {
+            position: fixed;
+            inset: 0;
+            z-index: 4600;
+            background: #FBF0D6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .delivery-fullscreen[hidden] {
+            display: none;
+        }
+
+        .delivery-topbar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px 16px;
+        }
+
+        .delivery-topbar-btn {
+            width: 40px;
+            height: 40px;
+            flex-shrink: 0;
+            border: none;
+            border-radius: 50%;
+            background: white;
+            color: var(--dark);
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+        }
+
+        .delivery-topbar-title {
+            font-weight: 800;
+            font-size: 14.5px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+
+        .delivery-topbar-spacer {
+            width: 40px;
+            flex-shrink: 0;
+        }
+
+        .delivery-map-wrap {
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+
+        .delivery-map-full {
             width: 100%;
-            height: 220px;
-            border-radius: 14px;
-            border: 2px solid rgba(138, 97, 22, 0.2);
-            margin-bottom: 10px;
+            height: 100%;
             background: #eee;
+        }
+
+        .delivery-locate-pill {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 30px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 800;
+            white-space: nowrap;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+            cursor: pointer;
+        }
+
+        .delivery-form-sheet {
+            flex-shrink: 0;
+            background: #FBF0D6;
+            padding: 16px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+            box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.1);
         }
 
         .delivery-map-hint {
             font-size: 12.5px;
             color: #8a7554;
-            margin-bottom: 12px;
-            min-height: 32px;
-        }
-
-        .delivery-locate-btn {
-            width: 100%;
-            background: white;
-            border: 2px solid rgba(138, 97, 22, 0.2);
-            border-radius: 12px;
-            padding: 11px;
-            font-family: inherit;
-            font-size: 13.5px;
-            font-weight: 700;
-            color: var(--dark);
-            cursor: pointer;
-            margin-bottom: 12px;
-        }
-
-        .delivery-locate-btn:hover {
-            border-color: var(--primary);
+            margin-bottom: 10px;
+            min-height: 18px;
         }
 
         .delivery-phone-input {
@@ -2492,6 +2600,7 @@
             font-size: 14px;
             color: var(--dark);
             margin-bottom: 10px;
+            box-sizing: border-box;
         }
 
         .delivery-reference-input {
@@ -2504,6 +2613,7 @@
             color: var(--dark);
             resize: vertical;
             margin-bottom: 10px;
+            box-sizing: border-box;
         }
 
         .delivery-validation-msg {
@@ -2528,7 +2638,6 @@
             font-weight: 800;
             color: white;
             cursor: pointer;
-            margin-bottom: 14px;
         }
 
         .delivery-confirm-btn:disabled {
@@ -2625,24 +2734,31 @@
     </div>
 
     <!-- VENTANA APARTE: confirmar ubicación de domicilio -->
-    <div class="order-type-overlay" id="deliveryLocationOverlay" hidden>
-        <div class="order-type-card delivery-location-step" id="deliveryLocationStep">
-            <h2>Confirma tu domicilio</h2>
-            <div class="order-type-subtitle">Ajusta el pin y completa tus datos de entrega</div>
-            <div id="deliveryMap" class="delivery-map"></div>
-            <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
-            <button type="button" class="delivery-locate-btn" id="deliveryLocateBtn">
-                <i class="fas fa-location-crosshairs"></i> Usar mi ubicación actual
+    <div class="delivery-fullscreen" id="deliveryLocationOverlay" hidden>
+        <div class="delivery-topbar">
+            <button type="button" class="delivery-topbar-btn" id="deliveryBackBtn" aria-label="Regresar">
+                <i class="fas fa-arrow-left"></i>
             </button>
+            <span class="delivery-topbar-title">Entrega a domicilio</span>
+            <span class="delivery-topbar-spacer"></span>
+        </div>
+
+        <div class="delivery-map-wrap">
+            <div id="deliveryMap" class="delivery-map-full"></div>
+            <button type="button" class="delivery-locate-pill" id="deliveryLocateBtn">
+                <i class="fas fa-location-crosshairs"></i> Localízame
+            </button>
+        </div>
+
+        <div class="delivery-form-sheet" id="deliveryLocationStep">
+            <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
             <input type="tel" id="deliveryPhoneInput" class="delivery-phone-input" placeholder="Tu número de contacto *" maxlength="20">
             <textarea id="deliveryReferenceInput" class="delivery-reference-input" rows="2" placeholder="Descripción del domicilio: color de casa, entre calles, depto, etc. *"></textarea>
             <div class="delivery-validation-msg" id="deliveryValidationMsg" hidden>Falta tu número de contacto y/o la descripción del domicilio.</div>
             <button type="button" class="delivery-confirm-btn" id="deliveryConfirmBtn">Confirmar dirección</button>
-            <button type="button" class="table-back-btn" id="deliveryBackBtn">
-                <i class="fas fa-arrow-left"></i> Regresar
-            </button>
         </div>
     </div>
+
 
 
     <!-- HEADER -->
@@ -2975,6 +3091,12 @@
         <span class="order-fab-badge" id="orderFabBadge" hidden></span>
     </button>
 
+    <!-- AVISO FLOTANTE DEL CARRITO (aparece solo cuando hay productos) -->
+    <button type="button" class="cart-toast" id="cartToastBtn">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cartToastText">Ver carrito</span>
+    </button>
+
     <!-- MODAL: MIS PEDIDOS EN CURSO -->
     <div class="loyalty-modal-overlay" id="orderModalOverlay">
         <div class="loyalty-modal">
@@ -3205,7 +3327,7 @@
 
         let orderType = null;       // 'delivery' | 'pickup' | 'dine_in'
         let tableNumber = null;     // solo si orderType === 'dine_in'
-        let pendingCartOpen = false; // true cuando la pregunta se disparó desde el carrito, para abrirlo justo después de elegir
+        let pendingOrderTypeThenCheckout = false; // true cuando la pregunta se disparó desde "Finalizar pedido", para retomar el checkout justo después de elegir
 
         const orderTypeOverlay = document.getElementById('orderTypeOverlay');
         const orderTypeOptions = document.getElementById('orderTypeOptions');
@@ -3292,9 +3414,9 @@
             deliveryLocationOverlay.setAttribute('hidden', '');
             updateServiceUI();
             if (typeof renderCart === 'function') renderCart();
-            if (pendingCartOpen) {
-                pendingCartOpen = false;
-                if (typeof openCart === 'function') openCart();
+            if (pendingOrderTypeThenCheckout) {
+                pendingOrderTypeThenCheckout = false;
+                if (typeof continueCheckoutFlow === 'function') continueCheckoutFlow();
             }
         }
 
@@ -3801,6 +3923,8 @@
         const cartTotalEl = document.getElementById('cartTotal');
         const checkoutBtn = document.getElementById('checkoutBtn');
         const digitalOrderBtn = document.getElementById('digitalOrderBtn');
+        const cartToastBtn = document.getElementById('cartToastBtn');
+        const cartToastText = document.getElementById('cartToastText');
 
         function parsePrice(priceStr) {
             return parseFloat(priceStr.replace('MX$', '').replace(',', '')) || 0;
@@ -3927,6 +4051,16 @@
             cartBadge.classList.remove('bump');
             void cartBadge.offsetWidth; // reinicia la animación
             cartBadge.classList.add('bump');
+            updateCartToast();
+        }
+
+        // Aviso flotante sutil (abajo a la derecha): solo se muestra si hay
+        // productos en el carrito y el carrito no está ya abierto en pantalla.
+        function updateCartToast() {
+            const totalItems = cart.reduce((sum, c) => sum + c.qty, 0);
+            const shouldShow = totalItems > 0 && !cartOverlay.classList.contains('active');
+            cartToastText.textContent = totalItems > 0 ? `Ver carrito (${totalItems})` : 'Ver carrito';
+            cartToastBtn.classList.toggle('show', shouldShow);
         }
 
         function renderCart() {
@@ -3972,20 +4106,16 @@
         function openCart() {
             renderCart();
             cartOverlay.classList.add('active');
+            updateCartToast();
         }
 
         function closeCart() {
             cartOverlay.classList.remove('active');
+            updateCartToast();
         }
 
-        cartBtn.addEventListener('click', () => {
-            if (cart.length > 0 && orderType === null) {
-                pendingCartOpen = true;
-                reopenOrderType();
-            } else {
-                openCart();
-            }
-        });
+        cartBtn.addEventListener('click', openCart);
+        cartToastBtn.addEventListener('click', openCart);
         cartClose.addEventListener('click', closeCart);
         cartOverlay.addEventListener('click', (e) => {
             if (e.target === cartOverlay) closeCart();
@@ -4138,15 +4268,30 @@
 
         let pendingCheckoutType = 'whatsapp'; // 'whatsapp' | 'digital'
 
+        function continueCheckoutFlow() {
+            if (pendingCheckoutType === 'digital') maybeOfferCoupon();
+            else openAddonsModal();
+        }
+
         checkoutBtn.addEventListener('click', () => {
             if (cart.length === 0) return;
             pendingCheckoutType = 'whatsapp';
+            if (orderType === null) {
+                pendingOrderTypeThenCheckout = true;
+                reopenOrderType();
+                return;
+            }
             openAddonsModal();
         });
 
         digitalOrderBtn.addEventListener('click', () => {
             if (cart.length === 0) return;
             pendingCheckoutType = 'digital';
+            if (orderType === null) {
+                pendingOrderTypeThenCheckout = true;
+                reopenOrderType();
+                return;
+            }
             maybeOfferCoupon();
         });
 
@@ -4590,7 +4735,7 @@
         function resetSessionState() {
             orderType = null;
             tableNumber = null;
-            pendingCartOpen = false;
+            pendingOrderTypeThenCheckout = false;
             cart = [];
             if (typeof updateCartBadge === 'function') updateCartBadge();
             if (typeof renderCart === 'function') renderCart();
