@@ -155,7 +155,7 @@
 
         <!-- Paso 2: ya tiene tarjeta, muestra su QR -->
         <div id="pasoTarjeta">
-            <div class="qr-box"><canvas id="qrCanvas"></canvas></div>
+            <div class="qr-box"><img id="qrImg" width="190" height="190" alt="Código QR de tu tarjeta"></div>
             <div class="nombre-cliente" id="txtNombre"></div>
             <div class="id-tarjeta" id="txtId"></div>
 
@@ -170,7 +170,6 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         // Mismo proyecto de Firebase que la app principal, pero se usa
         // una colección aparte ("mesaCuponera") para no tocar nada de lo
@@ -223,8 +222,17 @@
         }
 
         function dibujarQR(id) {
-            const canvas = document.getElementById('qrCanvas');
-            QRCode.toCanvas(canvas, id, { width: 190, margin: 1, color: { dark: '#241B10', light: '#FFFFFF' } });
+            const img = document.getElementById('qrImg');
+            // Servicio gratuito que entrega la imagen del QR ya lista —
+            // nada que descargar ni ejecutar en el celular, solo pedir
+            // una imagen (mucho más confiable que dibujarlo con JS).
+            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=' + encodeURIComponent(id);
+            img.onerror = () => {
+                // Respaldo por si el celular no tiene internet en ese
+                // instante: al menos se ve el código para anotarlo a mano.
+                const box = img.closest('.qr-box');
+                box.innerHTML = `<div style="font-size:26px;font-weight:800;letter-spacing:2px;padding:20px;">${id}</div>`;
+            };
         }
 
         function pintarTarjeta(id, data) {
