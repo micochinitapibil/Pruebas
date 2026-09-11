@@ -2570,6 +2570,14 @@
             flex: 0 0 auto;
             height: 42vh;
             min-height: 0;
+            overflow: hidden;
+            transition: height 0.25s ease, opacity 0.2s ease;
+        }
+
+        .delivery-fullscreen.keyboard-open .delivery-map-wrap {
+            height: 0;
+            opacity: 0;
+            pointer-events: none;
         }
 
         .delivery-map-full {
@@ -3485,6 +3493,29 @@
         const deliveryReferenceInput = document.getElementById('deliveryReferenceInput');
         const deliveryValidationMsg = document.getElementById('deliveryValidationMsg');
         const deliveryConfirmBtn = document.getElementById('deliveryConfirmBtn');
+
+        // Mientras el cliente escribe (teclado abierto), colapsamos el mapa
+        // con una transición suave para que el campo nunca quede tapado por
+        // el teclado del celular. Con un pequeño respiro entre inputs para
+        // que no haga un parpadeo al saltar del teléfono a la descripción.
+        let deliveryKeyboardTimeout = null;
+        function setDeliveryKeyboardMode(active) {
+            clearTimeout(deliveryKeyboardTimeout);
+            if (active) {
+                deliveryLocationOverlay.classList.add('keyboard-open');
+            } else {
+                deliveryKeyboardTimeout = setTimeout(() => {
+                    deliveryLocationOverlay.classList.remove('keyboard-open');
+                    // El mapa vuelve a su tamaño normal: le avisamos a Leaflet
+                    // para que se redibuje bien con las nuevas medidas.
+                    setTimeout(() => { if (deliveryMap) deliveryMap.invalidateSize(); }, 260);
+                }, 150);
+            }
+        }
+        [deliveryPhoneInput, deliveryReferenceInput].forEach(el => {
+            el.addEventListener('focus', () => setDeliveryKeyboardMode(true));
+            el.addEventListener('blur', () => setDeliveryKeyboardMode(false));
+        });
 
         // Coordenadas del local (mismas del mapa de "Ubicación" que ya tienes),
         // se usan como punto de partida si el GPS del cliente falla.
