@@ -2635,6 +2635,57 @@
             min-height: 18px;
         }
 
+        /* Ventanita emergente: ubicación bloqueada */
+        .location-blocked-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 5200;
+            background: rgba(36, 27, 16, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .location-blocked-overlay[hidden] {
+            display: none;
+        }
+
+        .location-blocked-box {
+            background: #FBF0D6;
+            border-radius: 18px;
+            padding: 28px 24px;
+            max-width: 320px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .location-blocked-box i {
+            font-size: 34px;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+
+        .location-blocked-box p {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 18px;
+        }
+
+        .location-blocked-btn {
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-family: inherit;
+            font-weight: 800;
+            font-size: 14px;
+            padding: 10px 28px;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+
         /* Pastilla discreta con flechita que aparece solo cuando el
            teclado colapsó el mapa. Invita a jalar hacia abajo o a
            tocarla para que el mapa regrese. */
@@ -2839,6 +2890,16 @@
             <textarea id="deliveryReferenceInput" class="delivery-reference-input" rows="2" placeholder="Descripción del domicilio: color de casa, entre calles, depto, etc. *"></textarea>
             <div class="delivery-validation-msg" id="deliveryValidationMsg" hidden>Falta tu número de contacto y/o la descripción del domicilio.</div>
             <button type="button" class="delivery-confirm-btn" id="deliveryConfirmBtn">Confirmar dirección</button>
+        </div>
+    </div>
+
+    <!-- Ventanita emergente: se muestra cuando el cliente tiene la
+         ubicación bloqueada para este sitio y toca "Localízame". -->
+    <div class="location-blocked-overlay" id="locationBlockedOverlay" hidden>
+        <div class="location-blocked-box">
+            <i class="fas fa-location-crosshairs"></i>
+            <p>Activa la ubicación de tu celular para poder localizarte.</p>
+            <button type="button" class="location-blocked-btn" id="locationBlockedCloseBtn">Entendido</button>
         </div>
     </div>
 
@@ -3566,6 +3627,19 @@
 
         deliveryMapRestoreBtn.addEventListener('click', restoreDeliveryMap);
 
+        // Ventanita emergente para cuando la ubicación está bloqueada.
+        const locationBlockedOverlay = document.getElementById('locationBlockedOverlay');
+        const locationBlockedCloseBtn = document.getElementById('locationBlockedCloseBtn');
+        function showLocationBlockedPopup() {
+            locationBlockedOverlay.removeAttribute('hidden');
+        }
+        locationBlockedCloseBtn.addEventListener('click', () => {
+            locationBlockedOverlay.setAttribute('hidden', '');
+        });
+        locationBlockedOverlay.addEventListener('click', (e) => {
+            if (e.target === locationBlockedOverlay) locationBlockedOverlay.setAttribute('hidden', '');
+        });
+
         // También permite el gesto de deslizar el dedo hacia abajo sobre
         // la hoja del formulario (solo cuenta si el teclado está abierto).
         let deliverySwipeStartY = null;
@@ -3630,12 +3704,12 @@
             // cliente ya lo aceptó, la da sin preguntar; si ya lo bloqueó,
             // la niega sin preguntar tampoco (así evita que un sitio insista
             // una y otra vez). Por eso a veces "pide" y a veces no: aquí
-            // detectamos el caso bloqueado para explicarlo en vez de dejar
-            // que parezca que no hizo nada.
+            // detectamos el caso bloqueado para avisarle con una ventanita.
             if (navigator.permissions && navigator.permissions.query) {
                 navigator.permissions.query({ name: 'geolocation' }).then((status) => {
                     if (status.state === 'denied') {
-                        deliveryMapHint.textContent = 'Tienes bloqueada la ubicación para este sitio: tócala en el ícono junto a la dirección web (el candadito), actívala ahí y vuelve a intentar. Mientras tanto, mueve el pin a tu domicilio.';
+                        showLocationBlockedPopup();
+                        deliveryMapHint.textContent = 'No pudimos obtener tu ubicación (permiso denegado o sin señal). Mueve el pin a tu domicilio.';
                         setDeliveryPosition(STORE_LAT, STORE_LNG, 13);
                     } else {
                         requestPosition();
@@ -4972,7 +5046,7 @@
         // bajan de z-index para no tapar sus controles (como la "X").
         // ============================================
         (function () {
-            const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay'];
+            const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay',
                 'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
@@ -5029,7 +5103,7 @@
         // que pasa, por ejemplo, en YouTube al cerrar el reproductor.
         // ============================================
         (function () {
-            const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay'];
+            const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay',
                 'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
