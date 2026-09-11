@@ -131,12 +131,51 @@
         font-size: 14px;
         cursor: pointer;
     }
+
+    /* --- Pantalla de login (mismo patrón que comandas.html) --- */
+    #loginScreen {
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+    #loginScreen h1 { margin-bottom: 10px; }
+    #loginScreen .subtitle { margin-bottom: 28px; }
+    .btn-google {
+        border: none;
+        border-radius: 14px;
+        padding: 14px 24px;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 15px;
+        color: white;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        cursor: pointer;
+    }
+    #loginError {
+        display: none;
+        color: #a3342d;
+        font-size: 13px;
+        margin-top: 14px;
+        max-width: 280px;
+    }
+    #appScreen { display: none; }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div class="wrap" id="loginScreen">
     <h1>Escanear tarjeta</h1>
-    <div class="subtitle">Apunta la cámara al QR del comensal</div>
+    <div class="subtitle">Solo el personal del negocio puede entrar aquí</div>
+    <button type="button" class="btn-google" id="googleLoginBtn">Iniciar sesión con Google</button>
+    <div id="loginError"></div>
+</div>
+
+<div class="wrap" id="appScreen">
+    <h1>Escanear tarjeta</h1>
+    <div class="subtitle">Apunta la cámara al QR del comensal — <button type="button" id="logoutBtn" style="background:none;border:none;color:#a08a5f;text-decoration:underline;cursor:pointer;font-family:inherit;font-size:inherit;padding:0;">cerrar sesión</button></div>
 
     <div id="reader"></div>
 
@@ -162,6 +201,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
     const firebaseConfig = {
@@ -172,11 +212,14 @@
         messagingSenderId: "329969528973",
         appId: "1:329969528973:web:d7c60b4243f1ce5c9432c4"
     };
+    const ADMIN_EMAIL = "cochinitapibil172@gmail.com"; // única cuenta autorizada, igual que en comandas.html
+
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
 
     let LOYALTY_THRESHOLD = 7;
-    db.collection('configuracion').doc('negocio').onSnapshot(doc => {
+    db.collection('config').doc('general').onSnapshot(doc => {
         if (doc.exists && doc.data().loyaltyThreshold) LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
     });
 
@@ -184,15 +227,60 @@
     const cajaError = document.getElementById('cajaError');
     const reader = document.getElementById('reader');
     let idActual = null;
+    let scanner = null;
+    let scannerIniciado = false;
 
-    // Escáner de cámara. requestCameraPermission se dispara aquí mismo
-    // (así es como el navegador pide el permiso de cámara, igual que
-    // con la ubicación: solo pregunta la primera vez).
-    const scanner = new Html5QrcodeScanner('reader', {
-        fps: 10,
-        qrbox: { width: 230, height: 230 },
-        rememberLastUsedCamera: true
-    }, false);
+    // ==================================================
+    // LOGIN / LOGOUT (mismo patrón que comandas.html)
+    // ==================================================
+    const loginScreen = document.getElementById('loginScreen');
+    const appScreen = document.getElementById('appScreen');
+    const loginError = document.getElementById('loginError');
+
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
+    document.getElementById('googleLoginBtn').addEventListener('click', () => {
+        loginError.style.display = 'none';
+        auth.signInWithPopup(googleProvider)
+            .catch(err => {
+                if (err.code === 'auth/popup-closed-by-user') return;
+                loginError.textContent = 'No se pudo iniciar sesión con Google. Intenta de nuevo.';
+                loginError.style.display = 'block';
+            });
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut());
+
+    auth.onAuthStateChanged(user => {
+        if (user && user.email === ADMIN_EMAIL) {
+            loginScreen.style.display = 'none';
+            appScreen.style.display = 'block';
+            iniciarEscanerSiHaceFalta();
+        } else if (user) {
+            auth.signOut();
+            loginScreen.style.display = 'flex';
+            appScreen.style.display = 'none';
+            loginError.textContent = 'Esta cuenta no tiene permiso para escanear tarjetas.';
+            loginError.style.display = 'block';
+        } else {
+            loginScreen.style.display = 'flex';
+            appScreen.style.display = 'none';
+        }
+    });
+
+    // El permiso de cámara del navegador se pide apenas se llama a
+    // scanner.render(), así que eso solo debe pasar una vez, después de
+    // haber iniciado sesión como admin (si no, la cámara prendería antes
+    // de saber si la cuenta tiene permiso para escribir en Firestore).
+    function iniciarEscanerSiHaceFalta() {
+        if (scannerIniciado) return;
+        scannerIniciado = true;
+        scanner = new Html5QrcodeScanner('reader', {
+            fps: 10,
+            qrbox: { width: 230, height: 230 },
+            rememberLastUsedCamera: true
+        }, false);
+        scanner.render(onScanSuccess, () => { /* se ignoran los fotogramas sin QR */ });
+    }
 
     function pausarEscaner() {
         reader.style.display = 'none';
@@ -210,8 +298,6 @@
         pausarEscaner();
         buscarTarjeta(decodedText.trim());
     }
-
-    scanner.render(onScanSuccess, () => { /* se ignoran los fotogramas sin QR */ });
 
     async function buscarTarjeta(id) {
         try {

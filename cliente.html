@@ -192,7 +192,7 @@
 
         // Usa el mismo umbral configurado para la cuponera por correo,
         // para que ambos sistemas cuenten "igual" de parejo.
-        db.collection('configuracion').doc('negocio').onSnapshot(doc => {
+        db.collection('config').doc('general').onSnapshot(doc => {
             if (doc.exists && doc.data().loyaltyThreshold) {
                 LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
             }
