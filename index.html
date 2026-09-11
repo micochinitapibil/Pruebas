@@ -2635,6 +2635,37 @@
             min-height: 18px;
         }
 
+        /* Pastilla discreta con flechita que aparece solo cuando el
+           teclado colapsó el mapa. Invita a jalar hacia abajo o a
+           tocarla para que el mapa regrese. */
+        .delivery-map-restore {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 46px;
+            height: 22px;
+            margin: 0 auto 8px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(138, 97, 22, 0.14);
+            color: var(--secondary);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .delivery-fullscreen.keyboard-open .delivery-map-restore {
+            display: flex;
+        }
+
+        .delivery-map-restore i {
+            animation: deliveryArrowHint 1.4s ease-in-out infinite;
+        }
+
+        @keyframes deliveryArrowHint {
+            0%, 100% { transform: translateY(0); opacity: 0.5; }
+            50% { transform: translateY(4px); opacity: 1; }
+        }
+
         .delivery-phone-input {
             width: 100%;
             border: 2px solid rgba(138, 97, 22, 0.2);
@@ -2799,6 +2830,9 @@
         </div>
 
         <div class="delivery-form-sheet" id="deliveryLocationStep">
+            <button type="button" class="delivery-map-restore" id="deliveryMapRestoreBtn" aria-label="Mostrar el mapa de nuevo">
+                <i class="fas fa-chevron-down"></i>
+            </button>
             <div class="delivery-map-hint" id="deliveryMapHint">Obteniendo tu ubicación…</div>
             <input type="tel" id="deliveryPhoneInput" class="delivery-phone-input" placeholder="Tu número de contacto *" maxlength="20">
             <textarea id="deliveryReferenceInput" class="delivery-reference-input" rows="2" placeholder="Descripción del domicilio: color de casa, entre calles, depto, etc. *"></textarea>
@@ -3516,6 +3550,36 @@
             el.addEventListener('focus', () => setDeliveryKeyboardMode(true));
             el.addEventListener('blur', () => setDeliveryKeyboardMode(false));
         });
+
+        // Flechita/gesto para recuperar el mapa cuando el teclado lo tapó:
+        // quitarle el foco al campo de texto cierra el teclado y, gracias
+        // al 'blur' de arriba, el mapa vuelve solo.
+        const deliveryMapRestoreBtn = document.getElementById('deliveryMapRestoreBtn');
+        const deliveryLocationStep = document.getElementById('deliveryLocationStep');
+
+        function restoreDeliveryMap() {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+        }
+
+        deliveryMapRestoreBtn.addEventListener('click', restoreDeliveryMap);
+
+        // También permite el gesto de deslizar el dedo hacia abajo sobre
+        // la hoja del formulario (solo cuenta si el teclado está abierto).
+        let deliverySwipeStartY = null;
+        deliveryLocationStep.addEventListener('touchstart', (e) => {
+            if (!deliveryLocationOverlay.classList.contains('keyboard-open')) { deliverySwipeStartY = null; return; }
+            deliverySwipeStartY = e.touches[0].clientY;
+        }, { passive: true });
+        deliveryLocationStep.addEventListener('touchmove', (e) => {
+            if (deliverySwipeStartY === null) return;
+            if (e.touches[0].clientY - deliverySwipeStartY > 40) {
+                deliverySwipeStartY = null;
+                restoreDeliveryMap();
+            }
+        }, { passive: true });
+        deliveryLocationStep.addEventListener('touchend', () => { deliverySwipeStartY = null; });
 
         // Coordenadas del local (mismas del mapa de "Ubicación" que ya tienes),
         // se usan como punto de partida si el GPS del cliente falla.
@@ -4928,6 +4992,70 @@
                 observer.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] });
             });
             refresh();
+        })();
+
+        // ============================================
+        // BOTÓN "ATRÁS" DEL CELULAR CIERRA VENTANAS EMERGENTES
+        // Por defecto, la flechita de regresar del teléfono navega el
+        // historial del navegador (y si no hay páginas anteriores, sale
+        // de la app/navegador). Aquí hacemos que, mientras haya alguna
+        // ventana emergente abierta (ficha de producto, carrito,
+        // adicionales, cupón, mis pedidos, cuponera, tipo de pedido,
+        // entrega a domicilio...), esa flechita solo la cierre —igual
+        // que pasa, por ejemplo, en YouTube al cerrar el reproductor.
+        // ============================================
+        (function () {
+            const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay'];
+            const overlays = [
+                'productModalOverlay', 'cartOverlay', 'prepOverlay',
+                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
+                'orderModalOverlay', 'loyaltyModalOverlay',
+                ...hiddenBasedIds
+            ].map(id => document.getElementById(id)).filter(Boolean);
+
+            function isOverlayOpen(el) {
+                if (hiddenBasedIds.includes(el.id)) return !el.hasAttribute('hidden');
+                return el.classList.contains('active');
+            }
+
+            function closeOverlayElement(el) {
+                if (hiddenBasedIds.includes(el.id)) {
+                    el.setAttribute('hidden', '');
+                } else {
+                    el.classList.remove('active');
+                }
+            }
+
+            let wasOpen = false;
+            let handlingPopState = false;
+
+            // Cada vez que se abre o cierra una ventana emergente, se
+            // agrega (o se consume) un "escalón" en el historial del
+            // navegador, para que la flechita de atrás tenga algo que
+            // deshacer antes de intentar salir de la página de verdad.
+            function sync() {
+                const anyOpen = overlays.some(isOverlayOpen);
+                if (anyOpen && !wasOpen) {
+                    history.pushState({ miCochinitaOverlay: true }, '');
+                } else if (!anyOpen && wasOpen && !handlingPopState) {
+                    history.back();
+                }
+                wasOpen = anyOpen;
+            }
+
+            window.addEventListener('popstate', () => {
+                if (wasOpen) {
+                    handlingPopState = true;
+                    overlays.filter(isOverlayOpen).forEach(closeOverlayElement);
+                    wasOpen = false;
+                    setTimeout(() => { handlingPopState = false; }, 0);
+                }
+            });
+
+            const historyObserver = new MutationObserver(sync);
+            overlays.forEach(el => {
+                historyObserver.observe(el, { attributes: true, attributeFilter: ['class', 'hidden'] });
+            });
         })();
     </script>
 </body>
