@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi tarjeta — Comer aquí</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --primary: #C9A227;
+        --secondary: #8A6116;
+        --dark: #241B10;
+        --green: #52b788;
+        --cream: #FBF0D6;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: 'Poppins', 'Segoe UI', sans-serif;
+        background: var(--cream);
+        color: var(--dark);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+    }
+    .card {
+        width: 100%;
+        max-width: 360px;
+        text-align: center;
+    }
+    h1 {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--secondary);
+        margin: 0 0 6px;
+    }
+    .subtitle {
+        font-size: 13.5px;
+        color: #8a7554;
+        margin: 0 0 24px;
+    }
+
+    /* --- Paso 1: pedir nombre --- */
+    #pasoNombre input {
+        width: 100%;
+        border: 2px solid var(--primary);
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-family: inherit;
+        font-size: 16px;
+        margin-bottom: 14px;
+        background: white;
+        color: var(--dark);
+    }
+    #pasoNombre input:focus { outline: none; border-color: var(--secondary); }
+    .btn-primario {
+        width: 100%;
+        border: none;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-family: inherit;
+        font-weight: 800;
+        font-size: 15px;
+        color: white;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        cursor: pointer;
+    }
+    .aviso-privacidad {
+        font-size: 11.5px;
+        color: #a08a5f;
+        margin-top: 10px;
+        line-height: 1.4;
+    }
+
+    /* --- Paso 2: tarjeta con QR --- */
+    #pasoTarjeta { display: none; }
+    .qr-box {
+        background: white;
+        border-radius: 20px;
+        padding: 20px;
+        display: inline-block;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        margin-bottom: 18px;
+    }
+    .nombre-cliente {
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .id-tarjeta {
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: #a08a5f;
+        margin-bottom: 20px;
+    }
+    .progreso-wrap {
+        background: #efe2c0;
+        border-radius: 20px;
+        height: 10px;
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
+    .progreso-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        border-radius: 20px;
+        transition: width 0.4s ease;
+    }
+    .progreso-texto {
+        font-size: 13px;
+        color: var(--secondary);
+        font-weight: 600;
+        margin-bottom: 18px;
+    }
+    .banner-gratis {
+        background: rgba(82, 183, 136, 0.15);
+        color: #2f7a56;
+        border-radius: 14px;
+        padding: 10px 14px;
+        font-size: 13.5px;
+        font-weight: 700;
+        margin-bottom: 18px;
+        display: none;
+    }
+    .link-reiniciar {
+        background: none;
+        border: none;
+        color: #a08a5f;
+        font-size: 12.5px;
+        text-decoration: underline;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    #pasoCargando { font-size: 14px; color: #a08a5f; }
+</style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Comer aquí</h1>
+        <div class="subtitle">Tu tarjeta de visitas — sin correo, sin contraseña</div>
+
+        <div id="pasoCargando">Cargando…</div>
+
+        <!-- Paso 1: primera vez, solo pide el nombre -->
+        <div id="pasoNombre" style="display:none;">
+            <input type="text" id="inputNombre" placeholder="¿Cómo te llamas? (ej. Alejandro)" maxlength="30" autocomplete="given-name">
+            <button type="button" class="btn-primario" id="btnCrearTarjeta">Crear mi tarjeta</button>
+            <div class="aviso-privacidad">Solo pedimos tu nombre de pila. No necesitas correo ni teléfono.</div>
+        </div>
+
+        <!-- Paso 2: ya tiene tarjeta, muestra su QR -->
+        <div id="pasoTarjeta">
+            <div class="qr-box"><canvas id="qrCanvas"></canvas></div>
+            <div class="nombre-cliente" id="txtNombre"></div>
+            <div class="id-tarjeta" id="txtId"></div>
+
+            <div class="banner-gratis" id="bannerGratis"></div>
+
+            <div class="progreso-wrap"><div class="progreso-fill" id="progresoFill"></div></div>
+            <div class="progreso-texto" id="progresoTexto"></div>
+
+            <button type="button" class="link-reiniciar" id="btnReiniciar">No soy yo — crear otra tarjeta</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        // Mismo proyecto de Firebase que la app principal, pero se usa
+        // una colección aparte ("mesaCuponera") para no tocar nada de lo
+        // que ya funciona con cuenta/correo.
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3D1_bBKQJS2XQa_H0iSyJQ-xl51cj_0Q",
+            authDomain: "cochinita-pibil-admin.firebaseapp.com",
+            projectId: "cochinita-pibil-admin",
+            storageBucket: "cochinita-pibil-admin.firebasestorage.app",
+            messagingSenderId: "329969528973",
+            appId: "1:329969528973:web:d7c60b4243f1ce5c9432c4"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const LS_KEY = 'mesaQrTarjetaId';
+        let LOYALTY_THRESHOLD = 7; // valor de respaldo mientras carga la config real
+        let tarjetaUnsub = null;
+
+        // Usa el mismo umbral configurado para la cuponera por correo,
+        // para que ambos sistemas cuenten "igual" de parejo.
+        db.collection('configuracion').doc('negocio').onSnapshot(doc => {
+            if (doc.exists && doc.data().loyaltyThreshold) {
+                LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
+            }
+        });
+
+        const pasoCargando = document.getElementById('pasoCargando');
+        const pasoNombre = document.getElementById('pasoNombre');
+        const pasoTarjeta = document.getElementById('pasoTarjeta');
+        const inputNombre = document.getElementById('inputNombre');
+        const btnCrearTarjeta = document.getElementById('btnCrearTarjeta');
+        const btnReiniciar = document.getElementById('btnReiniciar');
+
+        // Alfabeto sin caracteres que se confunden fácil (0/O, 1/I/L).
+        const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        function generarId(largo = 7) {
+            let id = '';
+            for (let i = 0; i < largo; i++) {
+                id += ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
+            }
+            return id;
+        }
+
+        function mostrarPasoNombre() {
+            if (tarjetaUnsub) { tarjetaUnsub(); tarjetaUnsub = null; }
+            pasoCargando.style.display = 'none';
+            pasoTarjeta.style.display = 'none';
+            pasoNombre.style.display = 'block';
+        }
+
+        function dibujarQR(id) {
+            const canvas = document.getElementById('qrCanvas');
+            QRCode.toCanvas(canvas, id, { width: 190, margin: 1, color: { dark: '#241B10', light: '#FFFFFF' } });
+        }
+
+        function pintarTarjeta(id, data) {
+            dibujarQR(id);
+            document.getElementById('txtNombre').textContent = data.nombre;
+            document.getElementById('txtId').textContent = 'Código: ' + id;
+
+            const completados = data.ordersCompleted || 0;
+            const gratis = data.freeDishesAvailable || 0;
+            const progresoEnCiclo = completados % LOYALTY_THRESHOLD;
+            const pct = Math.round((progresoEnCiclo / LOYALTY_THRESHOLD) * 100);
+
+            document.getElementById('progresoFill').style.width = pct + '%';
+            document.getElementById('progresoTexto').textContent = `${progresoEnCiclo} de ${LOYALTY_THRESHOLD} visitas`;
+
+            const banner = document.getElementById('bannerGratis');
+            if (gratis > 0) {
+                banner.style.display = 'block';
+                banner.textContent = gratis === 1
+                    ? '¡Tienes 1 platillo gratis disponible!'
+                    : `¡Tienes ${gratis} platillos gratis disponibles!`;
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
+        function escucharTarjeta(id) {
+            if (tarjetaUnsub) tarjetaUnsub();
+            tarjetaUnsub = db.collection('mesaCuponera').doc(id).onSnapshot(doc => {
+                if (!doc.exists) {
+                    // La tarjeta ya no existe (se borró a mano, por ejemplo).
+                    localStorage.removeItem(LS_KEY);
+                    mostrarPasoNombre();
+                    return;
+                }
+                pasoCargando.style.display = 'none';
+                pasoNombre.style.display = 'none';
+                pasoTarjeta.style.display = 'block';
+                pintarTarjeta(id, doc.data());
+            }, err => {
+                console.error('Error leyendo la tarjeta:', err);
+            });
+        }
+
+        btnCrearTarjeta.addEventListener('click', async () => {
+            const nombre = inputNombre.value.trim();
+            if (!nombre) {
+                inputNombre.focus();
+                return;
+            }
+            btnCrearTarjeta.disabled = true;
+            btnCrearTarjeta.textContent = 'Creando…';
+            try {
+                const id = generarId();
+                await db.collection('mesaCuponera').doc(id).set({
+                    nombre: nombre,
+                    ordersCompleted: 0,
+                    freeDishesAvailable: 0,
+                    creada: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                localStorage.setItem(LS_KEY, id);
+                escucharTarjeta(id);
+            } catch (err) {
+                console.error('Error creando la tarjeta:', err);
+                btnCrearTarjeta.disabled = false;
+                btnCrearTarjeta.textContent = 'Crear mi tarjeta';
+                alert('No se pudo crear tu tarjeta. Intenta de nuevo.');
+            }
+        });
+
+        btnReiniciar.addEventListener('click', () => {
+            localStorage.removeItem(LS_KEY);
+            mostrarPasoNombre();
+            inputNombre.value = '';
+        });
+
+        // Arranque: si el celular ya tiene una tarjeta guardada, la muestra
+        // directo; si no, pide el nombre.
+        const idGuardado = localStorage.getItem(LS_KEY);
+        if (idGuardado) {
+            escucharTarjeta(idGuardado);
+        } else {
+            mostrarPasoNombre();
+        }
+    </script>
+</body>
+</html>

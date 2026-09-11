@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escanear tarjeta — Comer aquí</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --primary: #C9A227;
+        --secondary: #8A6116;
+        --dark: #241B10;
+        --green: #52b788;
+        --cream: #FBF0D6;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: 'Poppins', 'Segoe UI', sans-serif;
+        background: var(--cream);
+        color: var(--dark);
+        min-height: 100vh;
+        padding: 20px 16px 40px;
+    }
+    .wrap { max-width: 420px; margin: 0 auto; }
+    h1 {
+        font-size: 19px;
+        font-weight: 800;
+        color: var(--secondary);
+        text-align: center;
+        margin: 0 0 4px;
+    }
+    .subtitle {
+        font-size: 13px;
+        color: #8a7554;
+        text-align: center;
+        margin: 0 0 18px;
+    }
+
+    #reader {
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+    }
+
+    .resultado {
+        display: none;
+        background: white;
+        border-radius: 18px;
+        padding: 22px;
+        margin-top: 18px;
+        text-align: center;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .resultado .nombre { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+    .resultado .visitas { font-size: 13.5px; color: var(--secondary); margin-bottom: 4px; }
+    .resultado .gratis-tag {
+        display: inline-block;
+        background: rgba(82, 183, 136, 0.15);
+        color: #2f7a56;
+        font-size: 12.5px;
+        font-weight: 700;
+        border-radius: 20px;
+        padding: 4px 12px;
+        margin-bottom: 14px;
+    }
+    .btn-registrar {
+        width: 100%;
+        border: none;
+        border-radius: 14px;
+        padding: 14px;
+        font-family: inherit;
+        font-weight: 800;
+        font-size: 15px;
+        color: white;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        cursor: pointer;
+        margin-bottom: 10px;
+    }
+    .btn-registrar:disabled { opacity: 0.6; }
+    .btn-secundario {
+        width: 100%;
+        border: 2px solid var(--primary);
+        background: none;
+        border-radius: 14px;
+        padding: 12px;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--secondary);
+        cursor: pointer;
+    }
+
+    .error-box {
+        display: none;
+        background: #fdeaea;
+        color: #a3342d;
+        border-radius: 14px;
+        padding: 14px;
+        margin-top: 18px;
+        font-size: 13.5px;
+        text-align: center;
+    }
+
+    /* Búsqueda manual por nombre, para cuando se pierde el QR */
+    .busqueda-manual {
+        margin-top: 22px;
+        text-align: center;
+    }
+    .busqueda-manual summary {
+        font-size: 13px;
+        color: #a08a5f;
+        cursor: pointer;
+    }
+    .busqueda-manual input {
+        width: 100%;
+        border: 2px solid var(--primary);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-family: inherit;
+        font-size: 14px;
+        margin: 10px 0;
+    }
+    .resultados-busqueda { text-align: left; }
+    .resultado-item {
+        background: white;
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Escanear tarjeta</h1>
+    <div class="subtitle">Apunta la cámara al QR del comensal</div>
+
+    <div id="reader"></div>
+
+    <div class="resultado" id="cajaResultado">
+        <div class="nombre" id="resNombre"></div>
+        <div class="visitas" id="resVisitas"></div>
+        <div class="gratis-tag" id="resGratis" style="display:none;"></div>
+        <button type="button" class="btn-registrar" id="btnRegistrarVisita">Registrar visita</button>
+        <button type="button" class="btn-secundario" id="btnEscanearOtro">Escanear otra tarjeta</button>
+    </div>
+
+    <div class="error-box" id="cajaError">
+        No se encontró ninguna tarjeta con ese código.
+        <br><button type="button" class="btn-secundario" id="btnReintentar" style="margin-top:10px;">Volver a escanear</button>
+    </div>
+
+    <details class="busqueda-manual">
+        <summary>¿Se le perdió el QR? Buscar por nombre</summary>
+        <input type="text" id="inputBusqueda" placeholder="Escribe el nombre…">
+        <div class="resultados-busqueda" id="resultadosBusqueda"></div>
+    </details>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyA3D1_bBKQJS2XQa_H0iSyJQ-xl51cj_0Q",
+        authDomain: "cochinita-pibil-admin.firebaseapp.com",
+        projectId: "cochinita-pibil-admin",
+        storageBucket: "cochinita-pibil-admin.firebasestorage.app",
+        messagingSenderId: "329969528973",
+        appId: "1:329969528973:web:d7c60b4243f1ce5c9432c4"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let LOYALTY_THRESHOLD = 7;
+    db.collection('configuracion').doc('negocio').onSnapshot(doc => {
+        if (doc.exists && doc.data().loyaltyThreshold) LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
+    });
+
+    const cajaResultado = document.getElementById('cajaResultado');
+    const cajaError = document.getElementById('cajaError');
+    const reader = document.getElementById('reader');
+    let idActual = null;
+
+    // Escáner de cámara. requestCameraPermission se dispara aquí mismo
+    // (así es como el navegador pide el permiso de cámara, igual que
+    // con la ubicación: solo pregunta la primera vez).
+    const scanner = new Html5QrcodeScanner('reader', {
+        fps: 10,
+        qrbox: { width: 230, height: 230 },
+        rememberLastUsedCamera: true
+    }, false);
+
+    function pausarEscaner() {
+        reader.style.display = 'none';
+        scanner.pause(true);
+    }
+
+    function reanudarEscaner() {
+        cajaResultado.style.display = 'none';
+        cajaError.style.display = 'none';
+        reader.style.display = 'block';
+        scanner.resume();
+    }
+
+    function onScanSuccess(decodedText) {
+        pausarEscaner();
+        buscarTarjeta(decodedText.trim());
+    }
+
+    scanner.render(onScanSuccess, () => { /* se ignoran los fotogramas sin QR */ });
+
+    async function buscarTarjeta(id) {
+        try {
+            const doc = await db.collection('mesaCuponera').doc(id).get();
+            if (!doc.exists) {
+                cajaError.style.display = 'block';
+                return;
+            }
+            idActual = id;
+            pintarResultado(id, doc.data());
+        } catch (err) {
+            console.error('Error buscando la tarjeta:', err);
+            cajaError.style.display = 'block';
+        }
+    }
+
+    function pintarResultado(id, data) {
+        document.getElementById('resNombre').textContent = data.nombre;
+        const completados = data.ordersCompleted || 0;
+        const progresoEnCiclo = completados % LOYALTY_THRESHOLD;
+        document.getElementById('resVisitas').textContent = `${progresoEnCiclo} de ${LOYALTY_THRESHOLD} visitas`;
+
+        const gratis = data.freeDishesAvailable || 0;
+        const tagGratis = document.getElementById('resGratis');
+        if (gratis > 0) {
+            tagGratis.style.display = 'inline-block';
+            tagGratis.textContent = gratis === 1 ? '1 platillo gratis disponible' : `${gratis} platillos gratis disponibles`;
+        } else {
+            tagGratis.style.display = 'none';
+        }
+
+        cajaResultado.style.display = 'block';
+    }
+
+    // Misma lógica que ya usas en comandas.html para la cuponera por
+    // correo: suma un pedido y, si completa el ciclo, suma un platillo
+    // gratis disponible.
+    document.getElementById('btnRegistrarVisita').addEventListener('click', async () => {
+        if (!idActual) return;
+        const btn = document.getElementById('btnRegistrarVisita');
+        btn.disabled = true;
+        btn.textContent = 'Registrando…';
+        try {
+            const ref = db.collection('mesaCuponera').doc(idActual);
+            const doc = await ref.get();
+            const data = doc.data();
+            const newCount = (data.ordersCompleted || 0) + 1;
+            const currentFree = data.freeDishesAvailable || 0;
+            const updates = { ordersCompleted: newCount };
+            if (newCount % LOYALTY_THRESHOLD === 0) {
+                updates.freeDishesAvailable = currentFree + 1;
+            }
+            await ref.update(updates);
+            btn.textContent = '¡Visita registrada!';
+            setTimeout(reanudarEscaner, 900);
+        } catch (err) {
+            console.error('Error registrando la visita:', err);
+            btn.disabled = false;
+            btn.textContent = 'Registrar visita';
+            alert('No se pudo registrar la visita. Intenta de nuevo.');
+        }
+    });
+
+    document.getElementById('btnEscanearOtro').addEventListener('click', reanudarEscaner);
+    document.getElementById('btnReintentar').addEventListener('click', reanudarEscaner);
+
+    // Búsqueda manual por nombre (respaldo si el cliente perdió su QR).
+    // Nota: compara coincidencias parciales sin mayúsculas/minúsculas,
+    // trayendo todas las tarjetas — funciona bien con pocos clientes;
+    // si el negocio crece mucho conviene guardar el nombre en minúsculas
+    // aparte para poder filtrar la búsqueda directo en Firestore.
+    let tarjetasCache = null;
+    document.getElementById('inputBusqueda').addEventListener('input', async (e) => {
+        const texto = e.target.value.trim().toLowerCase();
+        const cont = document.getElementById('resultadosBusqueda');
+        if (!texto) { cont.innerHTML = ''; return; }
+
+        if (!tarjetasCache) {
+            const snap = await db.collection('mesaCuponera').get();
+            tarjetasCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+
+        const coincidencias = tarjetasCache.filter(t => (t.nombre || '').toLowerCase().includes(texto));
+        cont.innerHTML = coincidencias.map(t =>
+            `<div class="resultado-item" data-id="${t.id}">${t.nombre} — código ${t.id}</div>`
+        ).join('') || '<div style="font-size:13px;color:#a08a5f;">Sin coincidencias</div>';
+
+        cont.querySelectorAll('.resultado-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const t = tarjetasCache.find(x => x.id === el.dataset.id);
+                idActual = t.id;
+                pausarEscaner();
+                pintarResultado(t.id, t);
+            });
+        });
+    });
+</script>
+</body>
+</html>
