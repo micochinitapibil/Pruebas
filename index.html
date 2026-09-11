@@ -2642,15 +2642,16 @@
             display: none;
             align-items: center;
             justify-content: center;
-            width: 46px;
-            height: 22px;
-            margin: 0 auto 8px;
+            width: 58px;
+            height: 30px;
+            margin: 0 auto 10px;
             border: none;
             border-radius: 20px;
-            background: rgba(138, 97, 22, 0.14);
-            color: var(--secondary);
-            font-size: 12px;
+            background: var(--primary);
+            color: white;
+            font-size: 17px;
             cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
         }
 
         .delivery-fullscreen.keyboard-open .delivery-map-restore {
@@ -3609,17 +3610,40 @@
                 setDeliveryPosition(STORE_LAT, STORE_LNG, 13);
                 return;
             }
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    setDeliveryPosition(pos.coords.latitude, pos.coords.longitude, 16);
-                    deliveryMapHint.textContent = 'Ubicación detectada. Arrastra el pin si no cayó exacto.';
-                },
-                () => {
-                    deliveryMapHint.textContent = 'No pudimos obtener tu ubicación (permiso denegado o sin señal). Mueve el pin a tu domicilio.';
-                    setDeliveryPosition(STORE_LAT, STORE_LNG, 13);
-                },
-                { enableHighAccuracy: true, timeout: 8000 }
-            );
+
+            function requestPosition() {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        setDeliveryPosition(pos.coords.latitude, pos.coords.longitude, 16);
+                        deliveryMapHint.textContent = 'Ubicación detectada. Arrastra el pin si no cayó exacto.';
+                    },
+                    () => {
+                        deliveryMapHint.textContent = 'No pudimos obtener tu ubicación (permiso denegado o sin señal). Mueve el pin a tu domicilio.';
+                        setDeliveryPosition(STORE_LAT, STORE_LNG, 13);
+                    },
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            }
+
+            // El navegador solo muestra el aviso de "permitir ubicación" la
+            // primera vez, mientras el permiso siga sin decidirse. Si el
+            // cliente ya lo aceptó, la da sin preguntar; si ya lo bloqueó,
+            // la niega sin preguntar tampoco (así evita que un sitio insista
+            // una y otra vez). Por eso a veces "pide" y a veces no: aquí
+            // detectamos el caso bloqueado para explicarlo en vez de dejar
+            // que parezca que no hizo nada.
+            if (navigator.permissions && navigator.permissions.query) {
+                navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+                    if (status.state === 'denied') {
+                        deliveryMapHint.textContent = 'Tienes bloqueada la ubicación para este sitio: tócala en el ícono junto a la dirección web (el candadito), actívala ahí y vuelve a intentar. Mientras tanto, mueve el pin a tu domicilio.';
+                        setDeliveryPosition(STORE_LAT, STORE_LNG, 13);
+                    } else {
+                        requestPosition();
+                    }
+                }).catch(requestPosition);
+            } else {
+                requestPosition();
+            }
         }
 
         function openDeliveryLocationStep() {
