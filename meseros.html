@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meseros — Comer aquí</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    :root {
+        --primary: #C9A227;
+        --secondary: #8A6116;
+        --dark: #241B10;
+        --green: #52b788;
+        --red: #c0392b;
+        --cream: #FBF0D6;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: 'Poppins', 'Segoe UI', sans-serif;
+        background: var(--cream);
+        color: var(--dark);
+        min-height: 100vh;
+    }
+    .pantalla { display: none; min-height: 100vh; }
+    .pantalla.activa { display: block; }
+
+    h1 { font-size: 19px; font-weight: 800; color: var(--secondary); margin: 0; }
+    .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px;
+        background: rgba(255,255,255,0.6);
+    }
+    .topbar .quien {
+        font-size: 12.5px;
+        color: #8a7554;
+    }
+    .link-chico {
+        background: none;
+        border: none;
+        color: #a08a5f;
+        font-size: 12px;
+        text-decoration: underline;
+        cursor: pointer;
+        font-family: inherit;
+        padding: 0;
+    }
+
+    /* ===== LOGIN ===== */
+    #loginScreen .wrap {
+        max-width: 380px;
+        margin: 0 auto;
+        padding: 60px 20px;
+        text-align: center;
+    }
+    #loginScreen h1 { font-size: 22px; margin-bottom: 6px; }
+    #loginScreen .subtitle { font-size: 13.5px; color: #8a7554; margin-bottom: 26px; }
+    .lista-meseros {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+    .mesero-chip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: white;
+        border: 2px solid var(--primary);
+        border-radius: 14px;
+        padding: 13px 18px;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+    }
+    .mesero-chip .quitar {
+        color: #c0392b;
+        font-size: 13px;
+        font-weight: 400;
+    }
+    #loginScreen input {
+        width: 100%;
+        border: 2px solid var(--primary);
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-family: inherit;
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+    .btn-primario {
+        width: 100%;
+        border: none;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-family: inherit;
+        font-weight: 800;
+        font-size: 15px;
+        color: white;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        cursor: pointer;
+    }
+
+    /* ===== MESAS ===== */
+    #tablesScreen .grid-mesas {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        padding: 10px 18px 100px;
+    }
+    .mesa-card {
+        background: white;
+        border-radius: 16px;
+        padding: 18px 8px;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        border: 2px solid transparent;
+    }
+    .mesa-card .num { font-size: 22px; font-weight: 800; }
+    .mesa-card .estado {
+        margin-top: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .mesa-card.libre { border-color: rgba(82,183,136,0.4); }
+    .mesa-card.libre .estado { color: #2f7a56; }
+    .mesa-card.ocupada { border-color: rgba(192,57,43,0.35); background: #fdf1f0; }
+    .mesa-card.ocupada .estado { color: var(--red); }
+    .mesa-card .resumen { font-size: 11px; color: #a08a5f; margin-top: 4px; }
+
+    /* ===== FICHA DE MESA (modal) ===== */
+    .overlay {
+        position: fixed; inset: 0; z-index: 500;
+        background: rgba(36,27,16,0.5);
+        display: flex; align-items: flex-end; justify-content: center;
+    }
+    .overlay[hidden] { display: none; }
+    .hoja {
+        background: var(--cream);
+        width: 100%; max-width: 480px;
+        border-radius: 22px 22px 0 0;
+        padding: 22px 20px 26px;
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+    .hoja h2 { margin: 0 0 4px; color: var(--secondary); font-size: 20px; }
+    .hoja .estado-txt { font-size: 13px; margin-bottom: 16px; font-weight: 700; }
+    .items-actuales { margin-bottom: 16px; }
+    .item-actual-row {
+        display: flex; justify-content: space-between;
+        font-size: 14px; padding: 6px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .item-actual-row .nom { flex: 1; }
+    .total-actual {
+        display: flex; justify-content: space-between;
+        font-weight: 800; font-size: 15px; margin-top: 8px;
+    }
+    .btn-secundario {
+        width: 100%;
+        border: 2px solid var(--primary);
+        background: none;
+        border-radius: 14px;
+        padding: 13px;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 14.5px;
+        color: var(--secondary);
+        cursor: pointer;
+        margin-top: 10px;
+    }
+    .btn-peligro {
+        color: var(--red);
+        border-color: rgba(192,57,43,0.4);
+    }
+
+    /* ===== MENÚ ===== */
+    #menuScreen { padding-bottom: 110px; }
+    .filtros {
+        display: flex; gap: 8px; overflow-x: auto;
+        padding: 12px 14px; background: rgba(255,255,255,0.6);
+        position: sticky; top: 0; z-index: 50;
+    }
+    .filtros::-webkit-scrollbar { display: none; }
+    .filtro-btn {
+        flex: 0 0 auto;
+        background: transparent;
+        border: 2px solid var(--secondary);
+        color: var(--secondary);
+        padding: 8px 16px;
+        border-radius: 30px;
+        font-weight: 700;
+        font-size: 12.5px;
+        white-space: nowrap;
+        cursor: pointer;
+    }
+    .filtro-btn.active { background: var(--secondary); color: white; }
+
+    .lista-menu { padding: 14px 16px; }
+    .menu-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: white;
+        border-radius: 16px;
+        padding: 10px;
+        margin-bottom: 12px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    }
+    .menu-card img {
+        width: 62px; height: 62px; border-radius: 12px; object-fit: cover; flex-shrink: 0;
+    }
+    .menu-card .info { flex: 1; min-width: 0; }
+    .menu-card .nombre { font-weight: 700; font-size: 14px; }
+    .menu-card .precio { color: var(--secondary); font-weight: 700; font-size: 13px; margin-top: 2px; }
+    .stepper {
+        display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .stepper button {
+        width: 30px; height: 30px; border-radius: 50%;
+        border: none; background: var(--primary); color: white;
+        font-size: 16px; font-weight: 800; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .stepper button.quitar { background: #e0d3ab; color: var(--dark); }
+    .stepper .cant { min-width: 18px; text-align: center; font-weight: 800; }
+
+    .barra-resumen {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: var(--dark);
+        color: white;
+        padding: 14px 18px;
+        display: flex; align-items: center; justify-content: space-between;
+        z-index: 60;
+    }
+    .barra-resumen[hidden] { display: none; }
+    .barra-resumen .txt { font-size: 13.5px; }
+    .barra-resumen button {
+        border: none; border-radius: 12px; padding: 11px 20px;
+        font-family: inherit; font-weight: 800; font-size: 14px;
+        background: var(--primary); color: white; cursor: pointer;
+    }
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div class="pantalla activa" id="loginScreen">
+    <div class="wrap">
+        <h1>¿Quién eres?</h1>
+        <div class="subtitle">Elige tu nombre o agrega uno nuevo</div>
+        <div class="lista-meseros" id="listaMeseros"></div>
+        <input type="text" id="inputNombreMesero" placeholder="Tu nombre" maxlength="24">
+        <button type="button" class="btn-primario" id="btnEntrarMesero">Entrar</button>
+    </div>
+</div>
+
+<!-- ===== MESAS ===== -->
+<div class="pantalla" id="tablesScreen">
+    <div class="topbar">
+        <h1>Mesas</h1>
+        <div>
+            <span class="quien" id="quienEsTxt"></span>
+            — <button type="button" class="link-chico" id="btnCambiarMesero">cambiar</button>
+        </div>
+    </div>
+    <div class="grid-mesas" id="gridMesas"></div>
+</div>
+
+<!-- ===== MENÚ (para armar el pedido de una mesa) ===== -->
+<div class="pantalla" id="menuScreen">
+    <div class="topbar">
+        <button type="button" class="link-chico" id="btnVolverMesas">&larr; Mesas</button>
+        <h1 id="menuMesaTitulo">Mesa</h1>
+        <span></span>
+    </div>
+    <div class="filtros" id="filtrosMenu"></div>
+    <div class="lista-menu" id="listaMenu"></div>
+
+    <div class="barra-resumen" id="barraResumen" hidden>
+        <div class="txt" id="resumenTxt"></div>
+        <button type="button" id="btnGuardarPedido">Guardar pedido</button>
+    </div>
+</div>
+
+<!-- ===== FICHA DE MESA ===== -->
+<div class="overlay" id="fichaMesaOverlay" hidden>
+    <div class="hoja">
+        <h2 id="fichaMesaTitulo">Mesa</h2>
+        <div class="estado-txt" id="fichaMesaEstado"></div>
+        <div class="items-actuales" id="fichaMesaItems"></div>
+        <button type="button" class="btn-primario" id="btnAgregarPedido">Agregar pedido</button>
+        <button type="button" class="btn-secundario btn-peligro" id="btnLiberarMesa">Liberar mesa</button>
+        <button type="button" class="btn-secundario" id="btnCerrarFicha">Cerrar</button>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyA3D1_bBKQJS2XQa_H0iSyJQ-xl51cj_0Q",
+        authDomain: "cochinita-pibil-admin.firebaseapp.com",
+        projectId: "cochinita-pibil-admin",
+        storageBucket: "cochinita-pibil-admin.firebasestorage.app",
+        messagingSenderId: "329969528973",
+        appId: "1:329969528973:web:d7c60b4243f1ce5c9432c4"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ==================================================
+    // LOGIN POR NOMBRE (sin contraseña, guardado en el celular/tablet)
+    // ==================================================
+    const LS_MESEROS = 'meserosGuardados';
+    const LS_ACTIVO = 'meseroActivo';
+
+    function obtenerMeserosGuardados() {
+        try { return JSON.parse(localStorage.getItem(LS_MESEROS)) || []; }
+        catch (e) { return []; }
+    }
+    function guardarMeseros(lista) {
+        localStorage.setItem(LS_MESEROS, JSON.stringify(lista));
+    }
+
+    let meseroActivo = null;
+
+    function pintarListaMeseros() {
+        const cont = document.getElementById('listaMeseros');
+        const lista = obtenerMeserosGuardados();
+        cont.innerHTML = lista.map(nombre => `
+            <div class="mesero-chip" data-nombre="${nombre}">
+                <span>${nombre}</span>
+                <span class="quitar" data-quitar="${nombre}">Quitar</span>
+            </div>
+        `).join('');
+
+        cont.querySelectorAll('.mesero-chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                if (e.target.dataset.quitar) return; // el click de "Quitar" se maneja aparte
+                entrarComo(chip.dataset.nombre);
+            });
+        });
+        cont.querySelectorAll('[data-quitar]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const restante = obtenerMeserosGuardados().filter(n => n !== btn.dataset.quitar);
+                guardarMeseros(restante);
+                pintarListaMeseros();
+            });
+        });
+    }
+
+    function entrarComo(nombre) {
+        nombre = nombre.trim();
+        if (!nombre) return;
+        const lista = obtenerMeserosGuardados();
+        if (!lista.includes(nombre)) {
+            lista.push(nombre);
+            guardarMeseros(lista);
+        }
+        localStorage.setItem(LS_ACTIVO, nombre);
+        meseroActivo = nombre;
+        document.getElementById('quienEsTxt').textContent = nombre;
+        mostrarPantalla('tablesScreen');
+    }
+
+    document.getElementById('btnEntrarMesero').addEventListener('click', () => {
+        const input = document.getElementById('inputNombreMesero');
+        entrarComo(input.value);
+        input.value = '';
+    });
+
+    document.getElementById('btnCambiarMesero').addEventListener('click', () => {
+        localStorage.removeItem(LS_ACTIVO);
+        meseroActivo = null;
+        pintarListaMeseros();
+        mostrarPantalla('loginScreen');
+    });
+
+    function mostrarPantalla(id) {
+        document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+        document.getElementById(id).classList.add('activa');
+    }
+
+    // Si el celular ya tiene un mesero activo, entra directo.
+    pintarListaMeseros();
+    const activoGuardado = localStorage.getItem(LS_ACTIVO);
+    if (activoGuardado) entrarComo(activoGuardado);
+
+    // ==================================================
+    // MESAS (colección "mesasEstado", una por número de mesa)
+    // ==================================================
+    let TABLE_COUNT = 10;
+    let mesasData = {}; // { numero: {estado, mesero, items, total} }
+
+    db.collection('config').doc('general').onSnapshot(doc => {
+        if (doc.exists && doc.data().tableCount) {
+            TABLE_COUNT = doc.data().tableCount;
+            pintarMesas();
+        }
+    });
+
+    db.collection('mesasEstado').onSnapshot(snap => {
+        mesasData = {};
+        snap.forEach(doc => { mesasData[doc.id] = doc.data(); });
+        pintarMesas();
+    });
+
+    function pintarMesas() {
+        const grid = document.getElementById('gridMesas');
+        grid.innerHTML = '';
+        for (let i = 1; i <= TABLE_COUNT; i++) {
+            const data = mesasData[i] || { estado: 'libre', items: [] };
+            const ocupada = data.estado === 'ocupada';
+            const div = document.createElement('div');
+            div.className = 'mesa-card ' + (ocupada ? 'ocupada' : 'libre');
+            const cantItems = (data.items || []).reduce((s, it) => s + it.qty, 0);
+            div.innerHTML = `
+                <div class="num">${i}</div>
+                <div class="estado">${ocupada ? 'Ocupada' : 'Libre'}</div>
+                ${ocupada ? `<div class="resumen">${cantItems} producto(s)</div>` : ''}
+            `;
+            div.addEventListener('click', () => abrirFichaMesa(i));
+            grid.appendChild(div);
+        }
+    }
+
+    // ==================================================
+    // FICHA DE MESA
+    // ==================================================
+    let mesaActualNum = null;
+    const fichaMesaOverlay = document.getElementById('fichaMesaOverlay');
+
+    function abrirFichaMesa(num) {
+        mesaActualNum = num;
+        const data = mesasData[num] || { estado: 'libre', items: [] };
+        document.getElementById('fichaMesaTitulo').textContent = 'Mesa ' + num;
+        const estadoTxt = document.getElementById('fichaMesaEstado');
+        estadoTxt.textContent = data.estado === 'ocupada' ? 'Ocupada' : 'Libre';
+        estadoTxt.style.color = data.estado === 'ocupada' ? 'var(--red)' : '#2f7a56';
+
+        const itemsCont = document.getElementById('fichaMesaItems');
+        const items = data.items || [];
+        if (items.length) {
+            const total = items.reduce((s, it) => s + it.price * it.qty, 0);
+            itemsCont.innerHTML = items.map(it => `
+                <div class="item-actual-row"><span class="nom">${it.qty}x ${it.name}</span><span>MX$${(it.price * it.qty).toFixed(2)}</span></div>
+            `).join('') + `<div class="total-actual"><span>Total</span><span>MX$${total.toFixed(2)}</span></div>`;
+        } else {
+            itemsCont.innerHTML = '<div style="font-size:13.5px;color:#a08a5f;">Sin pedido todavía.</div>';
+        }
+
+        document.getElementById('btnLiberarMesa').style.display = data.estado === 'ocupada' ? 'block' : 'none';
+        fichaMesaOverlay.removeAttribute('hidden');
+    }
+
+    document.getElementById('btnCerrarFicha').addEventListener('click', () => fichaMesaOverlay.setAttribute('hidden', ''));
+    fichaMesaOverlay.addEventListener('click', (e) => { if (e.target === fichaMesaOverlay) fichaMesaOverlay.setAttribute('hidden', ''); });
+
+    document.getElementById('btnLiberarMesa').addEventListener('click', async () => {
+        if (!mesaActualNum) return;
+        await db.collection('mesasEstado').doc(String(mesaActualNum)).set({
+            estado: 'libre', mesero: null, items: [], total: 0,
+            actualizada: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        fichaMesaOverlay.setAttribute('hidden', '');
+    });
+
+    document.getElementById('btnAgregarPedido').addEventListener('click', () => {
+        fichaMesaOverlay.setAttribute('hidden', '');
+        abrirMenuParaMesa(mesaActualNum);
+    });
+
+    // ==================================================
+    // MENÚ (mismo criterio que index.html: productos activos de Firestore)
+    // ==================================================
+    const IMAGE_BASE_URL = './';
+    const productImageMap = {
+        'Taco de Cochinita Pibil': 'taco-cochinita.jpg', 'Panucho': 'panucho.jpg',
+        'Torta de Cochinita Pibil': 'torta.jpg', 'Gordita con Cochinita': 'gordita.jpg',
+        'Costra de Queso Rellena': 'costra.jpg', 'Burrito Pibil': 'burrito.jpg',
+        'Manita Pibil': 'manita.jpg', 'Quesadilla Pibil': 'quesadilla.jpg',
+        'Orden de Tacos (Blando, Dorado o Ahogado)': 'orden-tacos.jpg', 'Orden de Panuchos': 'orden-panuchos.jpg',
+        'Burritos Cuates': 'burritos.jpg', 'Dúo de Gorditas': 'duo-gorditas.jpg', 'Dúo de Tortas Pibil': 'duo-tortas.jpg',
+        'Manita a la Pibil Especial': 'manita-especial.jpg', 'Costilla con Espinazo Pibil': 'costilla.jpg',
+        'Paquete Especial': 'paquete-especial2.jpg', 'Panuchero': 'panuchero.jpg', 'Gordito': 'gordito.jpg',
+        'Vaporcito': 'vaporcito.jpg', 'Super Oinc': 'superoinc.jpg', 'Superpib': 'superpib.jpg', 'Taquero': 'taquero.jpg',
+        'Vaporcitos': 'vaporcitos.jpg', 'Chamorro': 'chamorro.jpg', 'Molletes': 'molletes.jpg',
+        'Enchiladas': 'enchiladas.jpg', 'Enfrijoladas': 'enfrijoladas.jpg', 'Chilaquiles': 'chilaquiles.jpg',
+        'CochiPaq 1 (250gr)': 'paquete-especial.jpg', 'CochiPaq 2 (500gr)': 'paquete-especial.jpg',
+        'CochiPaq 3 (750gr)': 'paquete-especial.jpg', 'CochiPaq 4 (1kg)': 'paquete-especial.jpg',
+        'CochiPaq 5 (1.5kg)': 'paquete-especial.jpg', 'CochiPaq 6 (2kg)': 'paquete-especial.jpg',
+        '500 gramos de Cochinita': 'cochinitangramos.jpg', '750 gramos de Cochinita': 'cochinitangramos.jpg',
+        '1 kilo de Cochinita': 'cochinitangramos.jpg', 'Agua de Jamaica': 'agua-jamaica.jpg',
+        'Agua de Maracuyá': 'agua-maracuya.jpg', 'Agua de Horchata': 'agua-horchata.jpg',
+        'Agua de Limón con Menta': 'agua-limon.jpg', 'Agua de Piña Colada': 'agua-pina.jpg',
+        'Agua de Frutos Rojos': 'aguadefrutosrojos.jpg', 'Coca-Cola 500ml': 'cocacola500ml.jpg',
+        'Coca-Cola PET 600ml': 'cocacolapet600ml.jpg', 'Jugo de Naranja': 'jugodenaranja.jpg',
+        'Café Negro o Té': 'cafeote.jpg', 'Atole 500ml': 'atole500ml.jpg', 'Atole por Litro': 'atoleporlitro.jpg',
+        'Orden de Tostadas Panucheras': 'tostadas-panucheras.jpg', 'Tostadas Panucheras Adicionales': 'tostadas-extra.jpg',
+        'Salsa Habanero': 'salsa.jpg', 'Cebollitas con Habanero': 'cebollitasconabanero.jpg',
+        'Cebollitas con Limón y Orégano': 'cebollitassinabanero.jpg', 'Frijoles Refritos': 'FRIJOLES.jpg'
+    };
+    let liveImageMap = {};
+    function getProductImage(name) {
+        if (liveImageMap[name]) return liveImageMap[name];
+        if (productImageMap[name]) return IMAGE_BASE_URL + productImageMap[name];
+        return 'https://via.placeholder.com/120x120?text=' + encodeURIComponent(name);
+    }
+
+    const CATEGORIAS = [
+        { id: 'todos', label: 'Todos' },
+        { id: 'tradicionales', label: 'Tradicionales' },
+        { id: 'antojitos', label: 'Antojitos' },
+        { id: 'cochipaqs', label: "CochiPaq's" },
+        { id: 'especiales', label: 'CochiCombos' },
+        { id: 'promociones', label: 'Promociones' },
+        { id: 'aguas', label: 'Bebidas' },
+        { id: 'extras', label: 'Extras' }
+    ];
+    document.getElementById('filtrosMenu').innerHTML = CATEGORIAS.map(c =>
+        `<button type="button" class="filtro-btn${c.id === 'todos' ? ' active' : ''}" data-filtro="${c.id}">${c.label}</button>`
+    ).join('');
+
+    let menuItems = [];
+    db.collection('productos').where('active', '==', true).orderBy('order', 'asc').onSnapshot(snap => {
+        menuItems = [];
+        liveImageMap = {};
+        snap.forEach(doc => {
+            const d = doc.data();
+            menuItems.push({ name: d.name, price: Number(d.price), category: d.category });
+            if (d.imageValue) {
+                liveImageMap[d.name] = d.imageSource === 'cloudinary' ? d.imageValue : IMAGE_BASE_URL + d.imageValue;
+            }
+        });
+        renderMenuLista(filtroActual);
+    });
+
+    let filtroActual = 'todos';
+    let pedidoEnCurso = {}; // { nombreProducto: {name, price, qty} }
+
+    document.getElementById('filtrosMenu').addEventListener('click', (e) => {
+        const btn = e.target.closest('.filtro-btn');
+        if (!btn) return;
+        document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filtroActual = btn.dataset.filtro;
+        renderMenuLista(filtroActual);
+    });
+
+    function renderMenuLista(filtro) {
+        const cont = document.getElementById('listaMenu');
+        const items = menuItems.filter(it => filtro === 'todos' || it.category === filtro);
+        cont.innerHTML = items.map(it => {
+            const enPedido = pedidoEnCurso[it.name];
+            const cant = enPedido ? enPedido.qty : 0;
+            return `
+                <div class="menu-card" data-nombre="${it.name}">
+                    <img src="${getProductImage(it.name)}" alt="${it.name}">
+                    <div class="info">
+                        <div class="nombre">${it.name}</div>
+                        <div class="precio">MX$${it.price.toFixed(2)}</div>
+                    </div>
+                    <div class="stepper">
+                        <button class="quitar" data-accion="quitar" ${cant === 0 ? 'style="visibility:hidden;"' : ''}>−</button>
+                        <span class="cant">${cant}</span>
+                        <button data-accion="agregar">+</button>
+                    </div>
+                </div>
+            `;
+        }).join('') || '<p style="text-align:center;color:#a08a5f;padding:30px;">Sin productos en esta categoría.</p>';
+
+        cont.querySelectorAll('.menu-card').forEach(card => {
+            const nombre = card.dataset.nombre;
+            const item = menuItems.find(i => i.name === nombre);
+            card.querySelector('[data-accion="agregar"]').addEventListener('click', () => {
+                if (!pedidoEnCurso[nombre]) pedidoEnCurso[nombre] = { name: item.name, price: item.price, qty: 0 };
+                pedidoEnCurso[nombre].qty++;
+                renderMenuLista(filtroActual);
+                actualizarBarraResumen();
+            });
+            const btnQuitar = card.querySelector('[data-accion="quitar"]');
+            if (btnQuitar) {
+                btnQuitar.addEventListener('click', () => {
+                    if (!pedidoEnCurso[nombre]) return;
+                    pedidoEnCurso[nombre].qty--;
+                    if (pedidoEnCurso[nombre].qty <= 0) delete pedidoEnCurso[nombre];
+                    renderMenuLista(filtroActual);
+                    actualizarBarraResumen();
+                });
+            }
+        });
+    }
+
+    function actualizarBarraResumen() {
+        const items = Object.values(pedidoEnCurso);
+        const barra = document.getElementById('barraResumen');
+        if (!items.length) { barra.setAttribute('hidden', ''); return; }
+        const totalCant = items.reduce((s, it) => s + it.qty, 0);
+        const totalPrecio = items.reduce((s, it) => s + it.qty * it.price, 0);
+        document.getElementById('resumenTxt').textContent = `${totalCant} producto(s) — MX$${totalPrecio.toFixed(2)}`;
+        barra.removeAttribute('hidden');
+    }
+
+    function abrirMenuParaMesa(num) {
+        mesaActualNum = num;
+        // Si la mesa ya tenía un pedido, se retoma para poder seguir agregando.
+        pedidoEnCurso = {};
+        const existentes = (mesasData[num] && mesasData[num].items) || [];
+        existentes.forEach(it => { pedidoEnCurso[it.name] = { ...it }; });
+
+        document.getElementById('menuMesaTitulo').textContent = 'Mesa ' + num;
+        renderMenuLista(filtroActual);
+        actualizarBarraResumen();
+        mostrarPantalla('menuScreen');
+    }
+
+    document.getElementById('btnVolverMesas').addEventListener('click', () => mostrarPantalla('tablesScreen'));
+
+    document.getElementById('btnGuardarPedido').addEventListener('click', async () => {
+        if (!mesaActualNum) return;
+        const items = Object.values(pedidoEnCurso);
+        const total = items.reduce((s, it) => s + it.qty * it.price, 0);
+        const btn = document.getElementById('btnGuardarPedido');
+        btn.disabled = true;
+        btn.textContent = 'Guardando…';
+        try {
+            await db.collection('mesasEstado').doc(String(mesaActualNum)).set({
+                estado: items.length ? 'ocupada' : 'libre',
+                mesero: meseroActivo,
+                items: items,
+                total: total,
+                actualizada: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            mostrarPantalla('tablesScreen');
+        } catch (err) {
+            console.error('Error guardando el pedido:', err);
+            alert('No se pudo guardar el pedido. Intenta de nuevo.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Guardar pedido';
+        }
+    });
+</script>
+</body>
+</html>
