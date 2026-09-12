@@ -340,6 +340,64 @@
         background: white; border-radius: 12px; padding: 10px 14px;
         margin-bottom: 8px; font-size: 13.5px; cursor: pointer; text-align: left;
     }
+
+    /* Sección para elegir qué platillo canjear dentro de la ficha de la
+       cuponera (solo aparece si hay platillos gratis Y se llegó desde
+       el menú de una mesa, para poder agregarlo al pedido). */
+    .canje-cupon-section {
+        display: none;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px dashed rgba(138,97,22,0.3);
+        text-align: left;
+    }
+    .canje-cupon-section .titulo-canje {
+        font-size: 12.5px; font-weight: 700; color: #2f7a56;
+        margin-bottom: 8px; text-align: center;
+    }
+    .canjeable-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: rgba(82,183,136,0.1);
+        border: 1.5px solid rgba(82,183,136,0.4);
+        color: #2f7a56;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 13.5px;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+
+    /* Lista de platillos gratis ya aplicados al pedido en curso,
+       mostrada en la pantalla del menú. */
+    #gratisAplicadosBox {
+        display: none;
+        background: rgba(82,183,136,0.12);
+        border-radius: 14px;
+        padding: 10px 14px;
+        margin: 0 16px 10px;
+    }
+    .gratis-chip {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        padding: 5px 0;
+        color: #2f7a56;
+        font-weight: 600;
+    }
+    .quitar-gratis {
+        color: var(--red);
+        font-weight: 700;
+        font-size: 12px;
+        cursor: pointer;
+        text-decoration: underline;
+        flex-shrink: 0;
+        margin-left: 10px;
+    }
 </style>
 </head>
 <body>
@@ -375,7 +433,7 @@
     <div class="topbar">
         <button type="button" class="link-chico" id="btnVolverMesas">&larr; Mesas</button>
         <h1 id="menuMesaTitulo">Mesa</h1>
-        <span></span>
+        <button type="button" class="link-chico" id="btnAbrirCuponeraMenu"><i class="fas fa-qrcode"></i> Cupón</button>
     </div>
     <div class="menu-nav">
         <div class="buscador-menu">
@@ -384,6 +442,7 @@
         </div>
         <div class="filtros" id="filtrosMenu"></div>
     </div>
+    <div id="gratisAplicadosBox"></div>
     <div class="lista-menu" id="listaMenu"></div>
 
     <div class="barra-resumen" id="barraResumen" hidden>
@@ -405,6 +464,12 @@
         <div class="nombre" id="cuponNombre"></div>
         <div class="visitas" id="cuponVisitas"></div>
         <div class="gratis-tag" id="cuponGratis" style="display:none;"></div>
+
+        <div class="canje-cupon-section" id="canjeCuponSection">
+            <div class="titulo-canje">🎁 Elige el platillo a canjear</div>
+            <div id="listaCanjeables"></div>
+        </div>
+
         <button type="button" class="btn-primario" id="btnRegistrarVisitaCupon">Registrar visita</button>
         <button type="button" class="btn-secundario" id="btnEscanearOtroCupon">Escanear otra tarjeta</button>
     </div>
@@ -584,7 +649,7 @@
         if (items.length) {
             const total = items.reduce((s, it) => s + it.price * it.qty, 0);
             itemsCont.innerHTML = items.map(it => `
-                <div class="item-actual-row"><span class="nom">${it.qty}x ${it.name}</span><span>MX$${(it.price * it.qty).toFixed(2)}</span></div>
+                <div class="item-actual-row"><span class="nom">${it.qty}x ${it.name}${it.gratis ? ' <span style="color:#2f7a56;font-weight:700;">🎁 gratis</span>' : ''}</span><span>MX$${(it.price * it.qty).toFixed(2)}</span></div>
             `).join('') + `<div class="total-actual"><span>Total</span><span>MX$${total.toFixed(2)}</span></div>`;
         } else {
             itemsCont.innerHTML = '<div style="font-size:13.5px;color:#a08a5f;">Sin pedido todavía.</div>';
@@ -668,7 +733,7 @@
         liveImageMap = {};
         snap.forEach(doc => {
             const d = doc.data();
-            menuItems.push({ name: d.name, price: Number(d.price), category: d.category });
+            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable });
             if (d.imageValue) {
                 liveImageMap[d.name] = d.imageSource === 'cloudinary' ? d.imageValue : IMAGE_BASE_URL + d.imageValue;
             }
@@ -764,7 +829,55 @@
         document.getElementById('menuMesaTitulo').textContent = 'Mesa ' + num;
         renderMenuLista(filtroActual);
         actualizarBarraResumen();
+        renderGratisAplicados();
         mostrarPantalla('menuScreen');
+    }
+
+    // ==================================================
+    // PLATILLOS GRATIS APLICADOS AL PEDIDO EN CURSO
+    // (se muestran como chips arriba del menú, con opción de quitar
+    // — quitar uno le devuelve el cupón a su tarjeta correspondiente)
+    // ==================================================
+    function renderGratisAplicados() {
+        const box = document.getElementById('gratisAplicadosBox');
+        const gratis = Object.entries(pedidoEnCurso).filter(([, v]) => v.gratis);
+        if (!gratis.length) {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            return;
+        }
+        box.style.display = 'block';
+        box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#2f7a56;margin-bottom:4px;">🎁 Platillos gratis en este pedido</div>' +
+            gratis.map(([key, it]) => `
+                <div class="gratis-chip" data-key="${key}">
+                    <span>${it.name}</span>
+                    <span class="quitar-gratis" data-key="${key}">Quitar</span>
+                </div>
+            `).join('');
+        box.querySelectorAll('.quitar-gratis').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const key = btn.dataset.key;
+                const it = pedidoEnCurso[key];
+                if (!it) return;
+                btn.textContent = 'Quitando…';
+                if (it.tarjetaId) {
+                    try {
+                        const ref = db.collection('mesaCuponera').doc(it.tarjetaId);
+                        const doc = await ref.get();
+                        if (doc.exists) {
+                            const actuales = (doc.data().freeDishesAvailable || 0) + 1;
+                            await ref.update({ freeDishesAvailable: actuales });
+                        }
+                    } catch (err) {
+                        console.error('Error devolviendo el cupón:', err);
+                        alert('No se pudo devolver el cupón a la tarjeta, pero el platillo se quitó del pedido.');
+                    }
+                }
+                delete pedidoEnCurso[key];
+                renderGratisAplicados();
+                actualizarBarraResumen();
+            });
+        });
     }
 
     document.getElementById('btnVolverMesas').addEventListener('click', () => mostrarPantalla('tablesScreen'));
@@ -806,13 +919,26 @@
     let idCuponActual = null;
     let scannerCupon = null;
     let scannerCuponIniciado = false;
+    // De dónde se abrió la cuponera: 'mesas' (lista de mesas, solo para
+    // registrar visitas) o 'menu' (armando un pedido, donde además se
+    // puede aplicar un platillo gratis a la mesa que se está armando).
+    let cuponOrigen = 'mesas';
 
-    document.getElementById('btnAbrirCuponera').addEventListener('click', () => {
+    function abrirCuponera(origen) {
+        cuponOrigen = origen;
         mostrarPantalla('cuponScreen');
-        iniciarScannerCuponSiHaceFalta();
-    });
+        if (!scannerCuponIniciado) {
+            iniciarScannerCuponSiHaceFalta();
+        } else if (document.getElementById('resultadoCupon').style.display === 'block'
+                || document.getElementById('errorCupon').style.display === 'block') {
+            reanudarScannerCupon();
+        }
+    }
+
+    document.getElementById('btnAbrirCuponera').addEventListener('click', () => abrirCuponera('mesas'));
+    document.getElementById('btnAbrirCuponeraMenu').addEventListener('click', () => abrirCuponera('menu'));
     document.getElementById('btnVolverDeCuponera').addEventListener('click', () => {
-        mostrarPantalla('tablesScreen');
+        mostrarPantalla(cuponOrigen === 'menu' ? 'menuScreen' : 'tablesScreen');
     });
 
     function iniciarScannerCuponSiHaceFalta() {
@@ -833,6 +959,7 @@
     function reanudarScannerCupon() {
         document.getElementById('resultadoCupon').style.display = 'none';
         document.getElementById('errorCupon').style.display = 'none';
+        document.getElementById('canjeCuponSection').style.display = 'none';
         document.getElementById('readerCupon').style.display = 'block';
         scannerCupon.resume();
     }
@@ -871,7 +998,63 @@
         } else {
             tagGratis.style.display = 'none';
         }
+
+        // El canje solo tiene sentido si venimos del menú de una mesa
+        // (hay dónde agregar el platillo gratis) y si de verdad hay
+        // cupones disponibles.
+        const seccionCanje = document.getElementById('canjeCuponSection');
+        const listaCanjeablesCont = document.getElementById('listaCanjeables');
+        if (gratis > 0 && cuponOrigen === 'menu' && mesaActualNum) {
+            const canjeables = menuItems.filter(it => it.redeemable);
+            if (canjeables.length) {
+                seccionCanje.style.display = 'block';
+                listaCanjeablesCont.innerHTML = canjeables.map(it =>
+                    `<button type="button" class="canjeable-btn" data-nombre="${it.name}">🎁 ${it.name}</button>`
+                ).join('');
+                listaCanjeablesCont.querySelectorAll('.canjeable-btn').forEach(btn => {
+                    btn.addEventListener('click', () => aplicarPlatilloGratis(id, btn.dataset.nombre));
+                });
+            } else {
+                seccionCanje.style.display = 'none';
+            }
+        } else {
+            seccionCanje.style.display = 'none';
+        }
+
         document.getElementById('resultadoCupon').style.display = 'block';
+    }
+
+    async function aplicarPlatilloGratis(tarjetaId, nombrePlatillo) {
+        if (!mesaActualNum) return;
+        const listaCanjeablesCont = document.getElementById('listaCanjeables');
+        listaCanjeablesCont.querySelectorAll('.canjeable-btn').forEach(b => b.disabled = true);
+        try {
+            const ref = db.collection('mesaCuponera').doc(tarjetaId);
+            const doc = await ref.get();
+            if (!doc.exists) { alert('La tarjeta ya no existe.'); return; }
+            const data = doc.data();
+            const actuales = data.freeDishesAvailable || 0;
+            if (actuales < 1) {
+                alert('Ya no hay platillos gratis disponibles en esta tarjeta.');
+                pintarResultadoCupon(tarjetaId, data);
+                return;
+            }
+            // Se descuenta de inmediato para evitar que se aplique dos
+            // veces por accidente si el mesero toca el botón otra vez.
+            await ref.update({ freeDishesAvailable: actuales - 1 });
+
+            const key = 'GRATIS::' + nombrePlatillo + '::' + Date.now();
+            pedidoEnCurso[key] = { name: nombrePlatillo, price: 0, qty: 1, gratis: true, tarjetaId: tarjetaId };
+            renderGratisAplicados();
+            actualizarBarraResumen();
+
+            pintarResultadoCupon(tarjetaId, { ...data, freeDishesAvailable: actuales - 1 });
+        } catch (err) {
+            console.error('Error aplicando el platillo gratis:', err);
+            alert('No se pudo aplicar el cupón. Intenta de nuevo.');
+        } finally {
+            listaCanjeablesCont.querySelectorAll('.canjeable-btn').forEach(b => b.disabled = false);
+        }
     }
 
     document.getElementById('btnRegistrarVisitaCupon').addEventListener('click', async () => {
