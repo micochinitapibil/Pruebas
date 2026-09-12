@@ -51,14 +51,14 @@
     }
 
     /* ===== LOGIN ===== */
-    #loginScreen .wrap {
+    #loginScreen .wrap, #passwordScreen .wrap {
         max-width: 380px;
         margin: 0 auto;
         padding: 60px 20px;
         text-align: center;
     }
-    #loginScreen h1 { font-size: 22px; margin-bottom: 6px; }
-    #loginScreen .subtitle { font-size: 13.5px; color: #8a7554; margin-bottom: 26px; }
+    #loginScreen h1, #passwordScreen h1 { font-size: 22px; margin-bottom: 6px; }
+    #loginScreen .subtitle, #passwordScreen .subtitle { font-size: 13.5px; color: #8a7554; margin-bottom: 26px; }
     .lista-meseros {
         display: flex;
         flex-direction: column;
@@ -82,7 +82,7 @@
         font-size: 13px;
         font-weight: 400;
     }
-    #loginScreen input {
+    #loginScreen input, #passwordScreen input {
         width: 100%;
         border: 2px solid var(--primary);
         border-radius: 14px;
@@ -90,6 +90,13 @@
         font-family: inherit;
         font-size: 16px;
         margin-bottom: 12px;
+    }
+    #passwordScreen .error-pass {
+        display: none;
+        color: var(--red);
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 12px;
     }
     .btn-primario {
         width: 100%;
@@ -258,6 +265,7 @@
     .menu-card .info { flex: 1; min-width: 0; }
     .menu-card .nombre { font-weight: 700; font-size: 14px; }
     .menu-card .precio { color: var(--secondary); font-weight: 700; font-size: 13px; margin-top: 2px; }
+    .menu-card .desc { color: #999; font-size: 12px; line-height: 1.4; margin-top: 4px; }
     .stepper {
         display: flex; align-items: center; gap: 8px; flex-shrink: 0;
     }
@@ -369,20 +377,27 @@
         margin-bottom: 8px; text-align: center;
     }
     .canjeable-btn {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         width: 100%;
         text-align: left;
         background: rgba(82,183,136,0.1);
         border: 1.5px solid rgba(82,183,136,0.4);
         color: #2f7a56;
         border-radius: 12px;
-        padding: 10px 14px;
+        padding: 8px 14px 8px 8px;
         font-family: inherit;
         font-weight: 700;
         font-size: 13.5px;
         margin-bottom: 8px;
         cursor: pointer;
     }
+    .canjeable-btn img {
+        width: 44px; height: 44px; border-radius: 9px; object-fit: cover; flex-shrink: 0;
+    }
+    .canjeable-btn span { flex: 1; min-width: 0; }
+    .canjeable-btn:disabled { opacity: 0.6; cursor: default; }
 
     /* Lista de platillos gratis ya aplicados al pedido en curso,
        mostrada en la pantalla del menú. */
@@ -415,8 +430,19 @@
 </head>
 <body>
 
+<!-- ===== CONTRASEÑA (compartida entre todos los meseros) ===== -->
+<div class="pantalla activa" id="passwordScreen">
+    <div class="wrap">
+        <h1>Acceso de meseros</h1>
+        <div class="subtitle">Escribe la contraseña del equipo</div>
+        <input type="password" id="inputPassMesero" placeholder="Contraseña" autocomplete="off">
+        <button type="button" class="btn-primario" id="btnEntrarPassMesero">Entrar</button>
+        <div class="error-pass" id="errorPassMesero">Contraseña incorrecta. Intenta de nuevo.</div>
+    </div>
+</div>
+
 <!-- ===== LOGIN ===== -->
-<div class="pantalla activa" id="loginScreen">
+<div class="pantalla" id="loginScreen">
     <div class="wrap">
         <h1>¿Quién eres?</h1>
         <div class="subtitle">Elige tu nombre o agrega uno nuevo</div>
@@ -568,25 +594,55 @@
     esperarAuth();
 
     // ==================================================
-    // LOGIN POR NOMBRE (sin contraseña, guardado en el celular/tablet)
+    // CONTRASEÑA COMPARTIDA (una sola clave para todo el equipo de
+    // meseros). No sustituye reglas de seguridad de Firestore — es solo
+    // un candado extra en la app, igual de "confiado" que el resto de
+    // este sistema (mesasEstado, mesaCuponera, etc.), pensado para que
+    // alguien que no trabaje aquí no entre por accidente si encuentra
+    // la URL.
     // ==================================================
-    const LS_MESEROS = 'meserosGuardados';
-    const LS_ACTIVO = 'meseroActivo';
+    const CLAVE_MESEROS = 'meseros31416';
+    const LS_PASS_OK = 'meseroPassOK';
 
-    function obtenerMeserosGuardados() {
-        try { return JSON.parse(localStorage.getItem(LS_MESEROS)) || []; }
-        catch (e) { return []; }
+    document.getElementById('btnEntrarPassMesero').addEventListener('click', intentarClaveMesero);
+    document.getElementById('inputPassMesero').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') intentarClaveMesero();
+    });
+    function intentarClaveMesero() {
+        const input = document.getElementById('inputPassMesero');
+        if (input.value === CLAVE_MESEROS) {
+            localStorage.setItem(LS_PASS_OK, '1');
+            document.getElementById('errorPassMesero').style.display = 'none';
+            input.value = '';
+            continuarDespuesDeClave();
+        } else {
+            document.getElementById('errorPassMesero').style.display = 'block';
+        }
     }
-    function guardarMeseros(lista) {
-        localStorage.setItem(LS_MESEROS, JSON.stringify(lista));
+    function continuarDespuesDeClave() {
+        mostrarPantalla('loginScreen');
+        const activoGuardado = localStorage.getItem(LS_ACTIVO);
+        if (activoGuardado) entrarComo(activoGuardado);
     }
+
+    // ==================================================
+    // LOGIN POR NOMBRE — la lista de meseros ahora vive en Firestore
+    // (config/meseros, campo "nombres") para que se vea igual en
+    // cualquier celular/tablet, no solo en el que lo dio de alta.
+    // ==================================================
+    const LS_ACTIVO = 'meseroActivo';
+    let nombresMeserosDisponibles = [];
+
+    db.collection('config').doc('meseros').onSnapshot(doc => {
+        nombresMeserosDisponibles = (doc.exists && doc.data().nombres) || [];
+        pintarListaMeseros();
+    }, err => console.error('Error cargando meseros:', err));
 
     let meseroActivo = null;
 
     function pintarListaMeseros() {
         const cont = document.getElementById('listaMeseros');
-        const lista = obtenerMeserosGuardados();
-        cont.innerHTML = lista.map(nombre => `
+        cont.innerHTML = nombresMeserosDisponibles.map(nombre => `
             <div class="mesero-chip" data-nombre="${nombre}">
                 <span>${nombre}</span>
                 <span class="quitar" data-quitar="${nombre}">Quitar</span>
@@ -602,9 +658,9 @@
         cont.querySelectorAll('[data-quitar]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const restante = obtenerMeserosGuardados().filter(n => n !== btn.dataset.quitar);
-                guardarMeseros(restante);
-                pintarListaMeseros();
+                db.collection('config').doc('meseros').set({
+                    nombres: firebase.firestore.FieldValue.arrayRemove(btn.dataset.quitar)
+                }, { merge: true }).catch(err => console.error('Error quitando mesero:', err));
             });
         });
     }
@@ -612,10 +668,10 @@
     function entrarComo(nombre) {
         nombre = nombre.trim();
         if (!nombre) return;
-        const lista = obtenerMeserosGuardados();
-        if (!lista.includes(nombre)) {
-            lista.push(nombre);
-            guardarMeseros(lista);
+        if (!nombresMeserosDisponibles.includes(nombre)) {
+            db.collection('config').doc('meseros').set({
+                nombres: firebase.firestore.FieldValue.arrayUnion(nombre)
+            }, { merge: true }).catch(err => console.error('Error agregando mesero:', err));
         }
         localStorage.setItem(LS_ACTIVO, nombre);
         meseroActivo = nombre;
@@ -632,7 +688,6 @@
     document.getElementById('btnCambiarMesero').addEventListener('click', () => {
         localStorage.removeItem(LS_ACTIVO);
         meseroActivo = null;
-        pintarListaMeseros();
         mostrarPantalla('loginScreen');
     });
 
@@ -641,10 +696,12 @@
         document.getElementById(id).classList.add('activa');
     }
 
-    // Si el celular ya tiene un mesero activo, entra directo.
-    pintarListaMeseros();
-    const activoGuardado = localStorage.getItem(LS_ACTIVO);
-    if (activoGuardado) entrarComo(activoGuardado);
+    // Arranque: si este dispositivo ya pasó la contraseña antes, se
+    // salta directo a elegir mesero (y si ya tenía uno activo, entra
+    // directo a Mesas).
+    if (localStorage.getItem(LS_PASS_OK) === '1') {
+        continuarDespuesDeClave();
+    }
 
     // ==================================================
     // MESAS (colección "mesasEstado", una por número de mesa)
@@ -836,7 +893,7 @@
         liveImageMap = {};
         snap.forEach(doc => {
             const d = doc.data();
-            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable });
+            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable, desc: d.desc || '' });
             if (d.imageValue) {
                 liveImageMap[d.name] = d.imageSource === 'cloudinary' ? d.imageValue : IMAGE_BASE_URL + d.imageValue;
             }
@@ -878,6 +935,7 @@
                     <div class="info">
                         <div class="nombre">${it.name}</div>
                         <div class="precio">MX$${it.price.toFixed(2)}</div>
+                        ${it.desc ? `<div class="desc">${it.desc}</div>` : ''}
                     </div>
                     <div class="stepper">
                         <button class="quitar" data-accion="quitar" ${cant === 0 ? 'style="visibility:hidden;"' : ''}>−</button>
@@ -1219,7 +1277,10 @@
             if (canjeables.length) {
                 seccionCanje.style.display = 'block';
                 listaCanjeablesCont.innerHTML = canjeables.map(it =>
-                    `<button type="button" class="canjeable-btn" data-nombre="${it.name}">🎁 ${it.name}</button>`
+                    `<button type="button" class="canjeable-btn" data-nombre="${it.name}">
+                        <img src="${getProductImage(it.name)}" alt="${it.name}">
+                        <span>🎁 ${it.name}</span>
+                    </button>`
                 ).join('');
                 listaCanjeablesCont.querySelectorAll('.canjeable-btn').forEach(btn => {
                     btn.addEventListener('click', () => aplicarPlatilloGratis(id, btn.dataset.nombre));
