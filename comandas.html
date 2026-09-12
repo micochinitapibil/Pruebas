@@ -552,7 +552,7 @@
                 ? `<ul class="order-breakdown">${breakdownRows.map(([label, val]) =>
                     `<li><span>${label}</span><span>${val}</span></li>`).join('')}</ul>`
                 : '';
-            const customer = o.customerEmail || 'Invitado';
+            const customer = o.meseroName ? `Mesero: ${o.meseroName}` : (o.customerEmail || 'Invitado');
             const locationHtml = (o.orderType === 'delivery' && o.deliveryLocation)
                 ? `<a class="order-location-link" href="https://maps.google.com/?q=${o.deliveryLocation.lat},${o.deliveryLocation.lng}" target="_blank" rel="noopener">📍 Ver ubicación de entrega</a>`
                 : '';

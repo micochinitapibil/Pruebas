@@ -491,6 +491,7 @@
     <div class="hoja">
         <h2 id="fichaMesaTitulo">Mesa</h2>
         <div class="estado-txt" id="fichaMesaEstado"></div>
+        <div class="estado-txt" id="fichaMesaComanda" style="display:none;color:var(--secondary);"></div>
         <div class="items-actuales" id="fichaMesaItems"></div>
         <button type="button" class="btn-primario" id="btnAgregarPedido">Agregar pedido</button>
         <button type="button" class="btn-secundario btn-peligro" id="btnLiberarMesa">Liberar mesa</button>
@@ -499,6 +500,7 @@
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
@@ -511,7 +513,34 @@
         appId: "1:329969528973:web:d7c60b4243f1ce5c9432c4"
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
+
+    // ==================================================
+    // AUTENTICACIÓN ANÓNIMA
+    // (necesaria para poder crear documentos en "comandas": las reglas
+    // piden que quien los crea esté autenticado y sea dueño del uid del
+    // documento — igual que hace index.html con sus clientes invitados.
+    // No requiere ningún cambio en las reglas de Firestore.)
+    // ==================================================
+    let meseroUid = null;
+    let authListo = null;
+    function esperarAuth() {
+        if (!authListo) {
+            authListo = new Promise((resolve) => {
+                const unsub = auth.onAuthStateChanged(user => {
+                    if (user) {
+                        meseroUid = user.uid;
+                        unsub();
+                        resolve(user.uid);
+                    }
+                });
+            });
+            auth.signInAnonymously().catch(err => console.error('Error de autenticación anónima:', err));
+        }
+        return authListo;
+    }
+    esperarAuth();
 
     // ==================================================
     // LOGIN POR NOMBRE (sin contraseña, guardado en el celular/tablet)
@@ -596,7 +625,43 @@
     // MESAS (colección "mesasEstado", una por número de mesa)
     // ==================================================
     let TABLE_COUNT = 10;
-    let mesasData = {}; // { numero: {estado, mesero, items, total} }
+    let mesasData = {}; // { numero: {estado, mesero, items, total, comandaId} }
+
+    // Estado de la comanda digital de cada mesa (nuevo/preparando/listo/
+    // entregado), alimentado por comandas.html. Se escucha solo el
+    // documento puntual (por su id) para respetar las reglas de
+    // Firestore, que solo dejan leer una comanda a quien la creó o al
+    // admin — nunca se hace una consulta abierta a toda la colección.
+    const ORDER_STATUS_INFO = {
+        nuevo: { icon: '🕐', label: 'Nuevo — esperando confirmación' },
+        preparando: { icon: '🔥', label: 'En preparación' },
+        listo: { icon: '✅', label: '¡Listo!' },
+        entregado: { icon: '🐷', label: 'Entregado' }
+    };
+    let comandaEstadoPorMesa = {}; // { numero: 'nuevo'|'preparando'|'listo'|'entregado' }
+    let comandaListenersPorMesa = {}; // { numero: {id, unsub} }
+
+    function actualizarListenersComandas() {
+        for (let i = 1; i <= TABLE_COUNT; i++) {
+            const data = mesasData[i];
+            const comandaId = data && data.comandaId;
+            const actual = comandaListenersPorMesa[i];
+
+            if (!comandaId) {
+                if (actual) { actual.unsub(); delete comandaListenersPorMesa[i]; delete comandaEstadoPorMesa[i]; }
+                continue;
+            }
+            if (actual && actual.id === comandaId) continue; // ya está escuchando la correcta
+
+            if (actual) actual.unsub();
+            const unsub = db.collection('comandas').doc(comandaId).onSnapshot(doc => {
+                comandaEstadoPorMesa[i] = doc.exists ? doc.data().status : null;
+                pintarMesas();
+                if (mesaActualNum === i && !fichaMesaOverlay.hidden) abrirFichaMesa(i);
+            }, err => console.error('Error leyendo el estado de la comanda:', err));
+            comandaListenersPorMesa[i] = { id: comandaId, unsub };
+        }
+    }
 
     db.collection('config').doc('general').onSnapshot(doc => {
         if (doc.exists && doc.data().tableCount) {
@@ -608,6 +673,7 @@
     db.collection('mesasEstado').onSnapshot(snap => {
         mesasData = {};
         snap.forEach(doc => { mesasData[doc.id] = doc.data(); });
+        actualizarListenersComandas();
         pintarMesas();
     });
 
@@ -620,10 +686,13 @@
             const div = document.createElement('div');
             div.className = 'mesa-card ' + (ocupada ? 'ocupada' : 'libre');
             const cantItems = (data.items || []).reduce((s, it) => s + it.qty, 0);
+            const estadoComanda = comandaEstadoPorMesa[i];
+            const infoComanda = estadoComanda ? ORDER_STATUS_INFO[estadoComanda] : null;
             div.innerHTML = `
                 <div class="num">${i}</div>
                 <div class="estado">${ocupada ? 'Ocupada' : 'Libre'}</div>
                 ${ocupada ? `<div class="resumen">${cantItems} producto(s)</div>` : ''}
+                ${infoComanda && estadoComanda !== 'entregado' ? `<div class="resumen">${infoComanda.icon} ${estadoComanda}</div>` : ''}
             `;
             div.addEventListener('click', () => abrirFichaMesa(i));
             grid.appendChild(div);
@@ -643,6 +712,15 @@
         const estadoTxt = document.getElementById('fichaMesaEstado');
         estadoTxt.textContent = data.estado === 'ocupada' ? 'Ocupada' : 'Libre';
         estadoTxt.style.color = data.estado === 'ocupada' ? 'var(--red)' : '#2f7a56';
+
+        const comandaTxt = document.getElementById('fichaMesaComanda');
+        const estadoComanda = comandaEstadoPorMesa[num];
+        if (estadoComanda && ORDER_STATUS_INFO[estadoComanda]) {
+            comandaTxt.style.display = 'block';
+            comandaTxt.textContent = ORDER_STATUS_INFO[estadoComanda].icon + ' Comanda: ' + ORDER_STATUS_INFO[estadoComanda].label;
+        } else {
+            comandaTxt.style.display = 'none';
+        }
 
         const itemsCont = document.getElementById('fichaMesaItems');
         const items = data.items || [];
@@ -665,7 +743,7 @@
     document.getElementById('btnLiberarMesa').addEventListener('click', async () => {
         if (!mesaActualNum) return;
         await db.collection('mesasEstado').doc(String(mesaActualNum)).set({
-            estado: 'libre', mesero: null, items: [], total: 0,
+            estado: 'libre', mesero: null, items: [], total: 0, comandaId: null,
             actualizada: firebase.firestore.FieldValue.serverTimestamp()
         });
         fichaMesaOverlay.setAttribute('hidden', '');
@@ -890,11 +968,42 @@
         btn.disabled = true;
         btn.textContent = 'Guardando…';
         try {
+            const dataActual = mesasData[mesaActualNum] || {};
+            let comandaId = dataActual.comandaId || null;
+            // ¿Ya hay una comanda en curso (no entregada) para esta mesa?
+            // Si la última fue entregada (o no existe), esta es una mesa
+            // nueva/reiniciada y hay que mandar una comanda nueva a cocina.
+            // Si ya hay una activa, no se puede editar (las reglas solo
+            // dejan que el admin actualice una comanda existente), así
+            // que solo se actualiza el pedido interno de la mesa.
+            const estadoComandaActual = comandaEstadoPorMesa[mesaActualNum];
+            const necesitaComandaNueva = items.length > 0 && (!comandaId || estadoComandaActual === 'entregado');
+
+            if (necesitaComandaNueva) {
+                await esperarAuth();
+                const nuevaComandaRef = db.collection('comandas').doc();
+                await nuevaComandaRef.set({
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'nuevo',
+                    orderType: 'dine_in',
+                    tableNumber: mesaActualNum,
+                    items: items,
+                    subtotal: total,
+                    total: total,
+                    uid: meseroUid,
+                    meseroName: meseroActivo,
+                    customerEmail: null,
+                    countsForLoyalty: false
+                });
+                comandaId = nuevaComandaRef.id;
+            }
+
             await db.collection('mesasEstado').doc(String(mesaActualNum)).set({
                 estado: items.length ? 'ocupada' : 'libre',
                 mesero: meseroActivo,
                 items: items,
                 total: total,
+                comandaId: items.length ? comandaId : null,
                 actualizada: firebase.firestore.FieldValue.serverTimestamp()
             });
             mostrarPantalla('tablesScreen');
@@ -928,10 +1037,11 @@
         cuponOrigen = origen;
         mostrarPantalla('cuponScreen');
         if (!scannerCuponIniciado) {
+            document.getElementById('resultadoCupon').style.display = 'none';
+            document.getElementById('errorCupon').style.display = 'none';
+            document.getElementById('canjeCuponSection').style.display = 'none';
+            document.getElementById('readerCupon').style.display = 'block';
             iniciarScannerCuponSiHaceFalta();
-        } else if (document.getElementById('resultadoCupon').style.display === 'block'
-                || document.getElementById('errorCupon').style.display === 'block') {
-            reanudarScannerCupon();
         }
     }
 
@@ -941,9 +1051,14 @@
         mostrarPantalla(cuponOrigen === 'menu' ? 'menuScreen' : 'tablesScreen');
     });
 
-    function iniciarScannerCuponSiHaceFalta() {
+    let limpiandoScanner = null;
+
+    async function iniciarScannerCuponSiHaceFalta() {
         if (scannerCuponIniciado) return;
         scannerCuponIniciado = true;
+        // Si veníamos de limpiar el escáner anterior, hay que esperar a
+        // que termine antes de crear uno nuevo sobre el mismo contenedor.
+        if (limpiandoScanner) { await limpiandoScanner.catch(() => {}); limpiandoScanner = null; }
         scannerCupon = new Html5QrcodeScanner('readerCupon', {
             fps: 10,
             qrbox: { width: 220, height: 220 },
@@ -954,14 +1069,24 @@
 
     function pausarScannerCupon() {
         document.getElementById('readerCupon').style.display = 'none';
-        scannerCupon.pause(true);
+        // Antes usábamos scannerCupon.pause(true), pero al combinarlo con
+        // ocultar el contenedor (display:none) la cámara se quedaba en un
+        // estado atorado y ya no volvía a arrancar al reanudar — el bug
+        // de "se queda cargando" al escanear una segunda tarjeta. Ahora
+        // se destruye por completo el escáner y se vuelve a crear desde
+        // cero cada vez, que es más lento por una fracción de segundo
+        // pero mucho más confiable.
+        if (scannerCupon) {
+            limpiandoScanner = scannerCupon.clear().catch(() => {});
+        }
+        scannerCuponIniciado = false;
     }
     function reanudarScannerCupon() {
         document.getElementById('resultadoCupon').style.display = 'none';
         document.getElementById('errorCupon').style.display = 'none';
         document.getElementById('canjeCuponSection').style.display = 'none';
         document.getElementById('readerCupon').style.display = 'block';
-        scannerCupon.resume();
+        iniciarScannerCuponSiHaceFalta();
     }
 
     function onScanCuponSuccess(decodedText) {
