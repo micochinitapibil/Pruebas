@@ -1367,16 +1367,18 @@
     document.getElementById('btnReintentarCupon').addEventListener('click', reanudarScannerCupon);
 
     // Búsqueda manual por nombre (respaldo si el comensal perdió su QR).
-    let tarjetasCuponCache = null;
-    document.getElementById('buscarCuponNombre').addEventListener('input', async (e) => {
+    // Se mantiene sincronizada en vivo con Firestore (en vez de pedirse
+    // una sola vez al cargar la página) para que una tarjeta creada o
+    // actualizada en OTRO celular aparezca aquí sin tener que recargar.
+    let tarjetasCuponCache = [];
+    db.collection('mesaCuponera').onSnapshot(snap => {
+        tarjetasCuponCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }, err => console.error('Error sincronizando tarjetas de cuponera:', err));
+
+    document.getElementById('buscarCuponNombre').addEventListener('input', (e) => {
         const texto = e.target.value.trim().toLowerCase();
         const cont = document.getElementById('resultadosBusquedaCupon');
         if (!texto) { cont.innerHTML = ''; return; }
-
-        if (!tarjetasCuponCache) {
-            const snap = await db.collection('mesaCuponera').get();
-            tarjetasCuponCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        }
 
         const coincidencias = tarjetasCuponCache.filter(t => (t.nombre || '').toLowerCase().includes(texto));
         cont.innerHTML = coincidencias.map(t =>
