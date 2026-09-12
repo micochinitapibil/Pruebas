@@ -1132,6 +1132,15 @@
         buscarTarjetaCupon(decodedText.trim());
     }
 
+    // Mantiene sincronizada la caché local de búsqueda por nombre cuando
+    // se registra una visita o se canjea un cupón, para que no se quede
+    // mostrando datos viejos hasta recargar la página.
+    function sincronizarCacheCupon(id, cambios) {
+        if (!tarjetasCuponCache) return;
+        const t = tarjetasCuponCache.find(x => x.id === id);
+        if (t) Object.assign(t, cambios);
+    }
+
     async function buscarTarjetaCupon(id) {
         try {
             const doc = await db.collection('mesaCuponera').doc(id).get();
@@ -1205,6 +1214,7 @@
             // Se descuenta de inmediato para evitar que se aplique dos
             // veces por accidente si el mesero toca el botón otra vez.
             await ref.update({ freeDishesAvailable: actuales - 1 });
+            sincronizarCacheCupon(tarjetaId, { freeDishesAvailable: actuales - 1 });
 
             const key = 'GRATIS::' + nombrePlatillo + '::' + Date.now();
             pedidoEnCurso[key] = { name: nombrePlatillo, price: 0, qty: 1, gratis: true, tarjetaId: tarjetaId };
@@ -1233,10 +1243,14 @@
             const newCount = (data.ordersCompleted || 0) + 1;
             const currentFree = data.freeDishesAvailable || 0;
             const updates = { ordersCompleted: newCount };
-            if (newCount % LOYALTY_THRESHOLD === 0) {
+            // Los cupones no son acumulables: si ya tiene uno sin usar, al
+            // llegar al umbral no se le suma otro (igual que en la
+            // cuponera de clientes registrados).
+            if (newCount % LOYALTY_THRESHOLD === 0 && currentFree === 0) {
                 updates.freeDishesAvailable = currentFree + 1;
             }
             await ref.update(updates);
+            sincronizarCacheCupon(idCuponActual, updates);
             pintarResultadoCupon(idCuponActual, { ...data, ...updates });
             btn.textContent = '¡Visita registrada!';
             setTimeout(reanudarScannerCupon, 900);
