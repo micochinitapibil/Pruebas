@@ -1208,10 +1208,11 @@
 
             const key = 'GRATIS::' + nombrePlatillo + '::' + Date.now();
             pedidoEnCurso[key] = { name: nombrePlatillo, price: 0, qty: 1, gratis: true, tarjetaId: tarjetaId };
+            renderMenuLista(filtroActual);
             renderGratisAplicados();
             actualizarBarraResumen();
 
-            pintarResultadoCupon(tarjetaId, { ...data, freeDishesAvailable: actuales - 1 });
+            mostrarPantalla('menuScreen');
         } catch (err) {
             console.error('Error aplicando el platillo gratis:', err);
             alert('No se pudo aplicar el cupón. Intenta de nuevo.');
@@ -1236,6 +1237,7 @@
                 updates.freeDishesAvailable = currentFree + 1;
             }
             await ref.update(updates);
+            pintarResultadoCupon(idCuponActual, { ...data, ...updates });
             btn.textContent = '¡Visita registrada!';
             setTimeout(reanudarScannerCupon, 900);
         } catch (err) {
