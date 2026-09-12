@@ -905,8 +905,7 @@
         pedidoEnCurso = {};
 
         const dataActual = mesasData[num] || {};
-        const estadoComandaActual = comandaEstadoPorMesa[num];
-        const hayComandaActiva = !!(dataActual.comandaId && estadoComandaActual && estadoComandaActual !== 'entregado');
+        const hayComandaActiva = !!dataActual.comandaId;
         etiquetaGuardar = hayComandaActiva ? 'Actualizar pedido' : 'Guardar pedido';
         document.getElementById('btnGuardarPedido').textContent = etiquetaGuardar;
 
@@ -980,25 +979,30 @@
             await esperarAuth();
             const dataActual = mesasData[mesaActualNum] || {};
             let comandaId = dataActual.comandaId || null;
-            // ¿Ya hay una comanda en curso (no entregada) para esta mesa?
-            // Si la última fue entregada (o no existe), esta es una mesa
-            // nueva/reiniciada y hay que mandar una comanda nueva a cocina.
-            // Si ya hay una activa, se ACTUALIZA esa misma comanda (no se
-            // crea otra) agregando una ligera división antes de los
-            // platillos nuevos, para que cocina vea que es una ronda
-            // adicional del mismo pedido. La única forma de que la
-            // siguiente mesa arranque una comanda nueva es que el mesero
-            // haya dado antes "Liberar mesa".
+            // ¿Ya hay una comanda asignada a esta mesa? Si es así, se
+            // ACTUALIZA esa misma comanda (no se crea otra) agregando una
+            // ligera división antes de los platillos nuevos — incluso si
+            // ya estaba marcada "Entregado" (la mesa sigue ocupada y pidió
+            // algo más, así que esa comanda se reactiva y vuelve a
+            // aparecer en "Activas"). La única forma de que la siguiente
+            // orden en esa mesa arranque una comanda nueva es que el
+            // mesero haya dado antes "Liberar mesa" (eso limpia el
+            // comandaId de la mesa).
             const estadoComandaActual = comandaEstadoPorMesa[mesaActualNum];
-            const comandaActiva = !!(comandaId && estadoComandaActual && estadoComandaActual !== 'entregado');
+            const comandaActiva = !!comandaId;
 
             // Tally combinado (solo para el resumen interno de la mesa):
-            // suma cantidades por nombre entre lo que ya había y lo nuevo.
+            // suma cantidades entre lo que ya había y lo nuevo, pero SIN
+            // mezclar un platillo gratis con uno pagado del mismo nombre
+            // (antes se agrupaba solo por nombre y un Panucho de cupón se
+            // sumaba al Panucho pagado, perdiendo el 🎁 y cobrándolo de más).
+            const claveTally = (it) => it.name + '::' + it.price + (it.gratis ? '::gratis' : '');
             const tallyMap = {};
-            (dataActual.items || []).forEach(it => { tallyMap[it.name] = { ...it }; });
+            (dataActual.items || []).forEach(it => { tallyMap[claveTally(it)] = { ...it }; });
             nuevosItems.forEach(it => {
-                if (tallyMap[it.name]) tallyMap[it.name].qty += it.qty;
-                else tallyMap[it.name] = { ...it };
+                const k = claveTally(it);
+                if (tallyMap[k]) tallyMap[k].qty += it.qty;
+                else tallyMap[k] = { ...it };
             });
             const itemsTally = Object.values(tallyMap);
             const totalTally = itemsTally.reduce((s, it) => s + it.qty * it.price, 0);
@@ -1013,11 +1017,17 @@
                     ...nuevosItems
                 ];
                 const totalComanda = itemsNuevosComanda.reduce((s, it) => s + (it.divider ? 0 : it.qty * it.price), 0);
-                await comandaRef.update({
+                const updatesComanda = {
                     items: itemsNuevosComanda,
                     subtotal: totalComanda,
                     total: totalComanda
-                });
+                };
+                // Si ya la habían marcado "Entregado", se reactiva: vuelve
+                // a "Nuevo" para que cocina la vea otra vez en Activas.
+                if (estadoComandaActual === 'entregado') {
+                    updatesComanda.status = 'nuevo';
+                }
+                await comandaRef.update(updatesComanda);
             } else {
                 const nuevaComandaRef = db.collection('comandas').doc();
                 await nuevaComandaRef.set({
