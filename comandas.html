@@ -271,6 +271,15 @@
         line-height: 1.6;
     }
     .order-items li.addon { color: var(--secondary); font-size: 12px; }
+    .order-items li.items-divider {
+        margin: 8px 0 6px;
+        padding-top: 6px;
+        border-top: 1px dashed #d8c690;
+        color: var(--secondary);
+        font-size: 11.5px;
+        font-weight: 600;
+        font-style: italic;
+    }
 
     .order-breakdown {
         list-style: none;
@@ -535,11 +544,12 @@
 
         const container = document.getElementById('ordersList');
         container.innerHTML = list.map((o, idx) => {
-            const itemsHtml = (o.items || []).map(i =>
-                i.freeRedeemed
+            const itemsHtml = (o.items || []).map(i => {
+                if (i.divider) return `<li class="items-divider">🕑 ${i.label || 'Agregó nuevos platillos'}</li>`;
+                return (i.freeRedeemed || i.gratis)
                     ? `<li style="color: var(--green); font-weight:700;">🎁 ${i.qty}x ${i.name} — GRATIS (cupón)</li>`
-                    : `<li>${i.qty}x ${i.name} — ${formatMoney(i.price)}</li>`
-            ).join('');
+                    : `<li>${i.qty}x ${i.name} — ${formatMoney(i.price)}</li>`;
+            }).join('');
             const addonsHtml = (o.addons || []).map(a =>
                 `<li class="addon">+ ${a.qty}x ${a.name} — ${formatMoney(a.price)}</li>`
             ).join('');

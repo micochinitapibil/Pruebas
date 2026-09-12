@@ -895,12 +895,20 @@
         barra.removeAttribute('hidden');
     }
 
+    let etiquetaGuardar = 'Guardar pedido';
+
     function abrirMenuParaMesa(num) {
         mesaActualNum = num;
-        // Si la mesa ya tenía un pedido, se retoma para poder seguir agregando.
+        // El carrito SIEMPRE empieza vacío: si la mesa ya tiene un pedido
+        // activo, esto es una ronda nueva de platillos que se agrega a la
+        // comanda existente — no se vuelve a mostrar lo que ya se pidió.
         pedidoEnCurso = {};
-        const existentes = (mesasData[num] && mesasData[num].items) || [];
-        existentes.forEach(it => { pedidoEnCurso[it.name] = { ...it }; });
+
+        const dataActual = mesasData[num] || {};
+        const estadoComandaActual = comandaEstadoPorMesa[num];
+        const hayComandaActiva = !!(dataActual.comandaId && estadoComandaActual && estadoComandaActual !== 'entregado');
+        etiquetaGuardar = hayComandaActiva ? 'Actualizar pedido' : 'Guardar pedido';
+        document.getElementById('btnGuardarPedido').textContent = etiquetaGuardar;
 
         busquedaActual = '';
         document.getElementById('buscarProducto').value = '';
@@ -962,34 +970,64 @@
 
     document.getElementById('btnGuardarPedido').addEventListener('click', async () => {
         if (!mesaActualNum) return;
-        const items = Object.values(pedidoEnCurso);
-        const total = items.reduce((s, it) => s + it.qty * it.price, 0);
+        const nuevosItems = Object.values(pedidoEnCurso);
+        if (!nuevosItems.length) { mostrarPantalla('tablesScreen'); return; }
+
         const btn = document.getElementById('btnGuardarPedido');
         btn.disabled = true;
-        btn.textContent = 'Guardando…';
+        btn.textContent = etiquetaGuardar === 'Actualizar pedido' ? 'Actualizando…' : 'Guardando…';
         try {
+            await esperarAuth();
             const dataActual = mesasData[mesaActualNum] || {};
             let comandaId = dataActual.comandaId || null;
             // ¿Ya hay una comanda en curso (no entregada) para esta mesa?
             // Si la última fue entregada (o no existe), esta es una mesa
             // nueva/reiniciada y hay que mandar una comanda nueva a cocina.
-            // Si ya hay una activa, no se puede editar (las reglas solo
-            // dejan que el admin actualice una comanda existente), así
-            // que solo se actualiza el pedido interno de la mesa.
+            // Si ya hay una activa, se ACTUALIZA esa misma comanda (no se
+            // crea otra) agregando una ligera división antes de los
+            // platillos nuevos, para que cocina vea que es una ronda
+            // adicional del mismo pedido. La única forma de que la
+            // siguiente mesa arranque una comanda nueva es que el mesero
+            // haya dado antes "Liberar mesa".
             const estadoComandaActual = comandaEstadoPorMesa[mesaActualNum];
-            const necesitaComandaNueva = items.length > 0 && (!comandaId || estadoComandaActual === 'entregado');
+            const comandaActiva = !!(comandaId && estadoComandaActual && estadoComandaActual !== 'entregado');
 
-            if (necesitaComandaNueva) {
-                await esperarAuth();
+            // Tally combinado (solo para el resumen interno de la mesa):
+            // suma cantidades por nombre entre lo que ya había y lo nuevo.
+            const tallyMap = {};
+            (dataActual.items || []).forEach(it => { tallyMap[it.name] = { ...it }; });
+            nuevosItems.forEach(it => {
+                if (tallyMap[it.name]) tallyMap[it.name].qty += it.qty;
+                else tallyMap[it.name] = { ...it };
+            });
+            const itemsTally = Object.values(tallyMap);
+            const totalTally = itemsTally.reduce((s, it) => s + it.qty * it.price, 0);
+
+            if (comandaActiva) {
+                const comandaRef = db.collection('comandas').doc(comandaId);
+                const comandaSnap = await comandaRef.get();
+                const itemsPreviosComanda = (comandaSnap.exists && comandaSnap.data().items) || [];
+                const itemsNuevosComanda = [
+                    ...itemsPreviosComanda,
+                    { divider: true, label: 'Agregó nuevos platillos' },
+                    ...nuevosItems
+                ];
+                const totalComanda = itemsNuevosComanda.reduce((s, it) => s + (it.divider ? 0 : it.qty * it.price), 0);
+                await comandaRef.update({
+                    items: itemsNuevosComanda,
+                    subtotal: totalComanda,
+                    total: totalComanda
+                });
+            } else {
                 const nuevaComandaRef = db.collection('comandas').doc();
                 await nuevaComandaRef.set({
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'nuevo',
                     orderType: 'dine_in',
                     tableNumber: mesaActualNum,
-                    items: items,
-                    subtotal: total,
-                    total: total,
+                    items: nuevosItems,
+                    subtotal: totalTally,
+                    total: totalTally,
                     uid: meseroUid,
                     meseroName: meseroActivo,
                     customerEmail: null,
@@ -999,11 +1037,11 @@
             }
 
             await db.collection('mesasEstado').doc(String(mesaActualNum)).set({
-                estado: items.length ? 'ocupada' : 'libre',
+                estado: 'ocupada',
                 mesero: meseroActivo,
-                items: items,
-                total: total,
-                comandaId: items.length ? comandaId : null,
+                items: itemsTally,
+                total: totalTally,
+                comandaId: comandaId,
                 actualizada: firebase.firestore.FieldValue.serverTimestamp()
             });
             mostrarPantalla('tablesScreen');
@@ -1012,7 +1050,7 @@
             alert('No se pudo guardar el pedido. Intenta de nuevo.');
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Guardar pedido';
+            btn.textContent = etiquetaGuardar;
         }
     });
 
