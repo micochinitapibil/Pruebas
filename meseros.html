@@ -182,21 +182,60 @@
 
     /* ===== MENÚ ===== */
     #menuScreen { padding-bottom: 110px; }
-    .filtros {
-        display: flex; gap: 8px; overflow-x: auto;
-        padding: 12px 14px; background: rgba(255,255,255,0.6);
-        position: sticky; top: 0; z-index: 50;
+
+    /* Barra de navegación del menú: buscador + filtros, sólida y fija
+       arriba (funciona como la barra de navegación principal de esta
+       pantalla, por eso va opaca y con z-index alto, no translúcida
+       como en index.html donde va debajo del ticket/encabezado). */
+    .menu-nav {
+        position: sticky;
+        top: 0;
+        z-index: 300;
+        background: var(--cream);
+        padding: 10px 14px 10px;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.06);
     }
-    .filtros::-webkit-scrollbar { display: none; }
-    .filtro-btn {
-        flex: 0 0 auto;
-        background: transparent;
-        border: 2px solid var(--secondary);
+    .buscador-menu {
+        position: relative;
+        margin-bottom: 8px;
+    }
+    .buscador-menu i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
         color: var(--secondary);
-        padding: 8px 16px;
+        font-size: 13px;
+        pointer-events: none;
+    }
+    .buscador-menu input {
+        width: 100%;
+        border: 2px solid var(--primary);
+        border-radius: 30px;
+        padding: 9px 16px 9px 36px;
+        font-family: inherit;
+        font-size: 13.5px;
+        background: white;
+        color: var(--dark);
+    }
+    .buscador-menu input:focus { outline: none; border-color: var(--secondary); }
+
+    .filtros {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+    }
+    .filtro-btn {
+        flex: 0 1 auto;
+        background: transparent;
+        border: 1.5px solid var(--secondary);
+        color: var(--secondary);
+        padding: 6px 12px;
         border-radius: 30px;
         font-weight: 700;
-        font-size: 12.5px;
+        font-size: 10.5px;
+        text-transform: uppercase;
         white-space: nowrap;
         cursor: pointer;
     }
@@ -246,6 +285,61 @@
         font-family: inherit; font-weight: 800; font-size: 14px;
         background: var(--primary); color: white; cursor: pointer;
     }
+
+    /* Botón de acceso a la cuponera (mesas + menú) */
+    .btn-cuponera {
+        border: none;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        color: white;
+        border-radius: 20px;
+        padding: 7px 14px;
+        font-family: inherit;
+        font-weight: 700;
+        font-size: 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    /* ===== CUPONERA (escáner de QR) ===== */
+    #cuponScreen { padding-bottom: 30px; }
+    #readerCupon { border-radius: 16px; overflow: hidden; margin: 12px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+    .resultado-cupon {
+        display: none;
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        margin: 12px 16px;
+        text-align: center;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    }
+    .resultado-cupon .nombre { font-size: 17px; font-weight: 700; }
+    .resultado-cupon .visitas { font-size: 13px; color: var(--secondary); margin: 4px 0 12px; }
+    .resultado-cupon .gratis-tag {
+        display: inline-block;
+        background: rgba(82,183,136,0.15);
+        color: #2f7a56;
+        font-size: 12px; font-weight: 700;
+        border-radius: 20px; padding: 4px 12px;
+        margin-bottom: 12px;
+    }
+    .error-cupon {
+        display: none;
+        background: #fdeaea; color: #a3342d;
+        border-radius: 14px; padding: 14px;
+        margin: 12px 16px; font-size: 13.5px; text-align: center;
+    }
+    .busqueda-cupon-manual { margin: 18px 16px 0; text-align: center; }
+    .busqueda-cupon-manual summary { font-size: 12.5px; color: #a08a5f; cursor: pointer; }
+    .busqueda-cupon-manual input {
+        width: 100%; border: 2px solid var(--primary); border-radius: 12px;
+        padding: 11px 14px; font-family: inherit; font-size: 13.5px; margin: 10px 0;
+    }
+    .resultado-item-cupon {
+        background: white; border-radius: 12px; padding: 10px 14px;
+        margin-bottom: 8px; font-size: 13.5px; cursor: pointer; text-align: left;
+    }
 </style>
 </head>
 <body>
@@ -270,6 +364,9 @@
             — <button type="button" class="link-chico" id="btnCambiarMesero">cambiar</button>
         </div>
     </div>
+    <div style="padding: 0 18px 6px;">
+        <button type="button" class="btn-cuponera" id="btnAbrirCuponera"><i class="fas fa-qrcode"></i> Cuponera / Escanear cupón</button>
+    </div>
     <div class="grid-mesas" id="gridMesas"></div>
 </div>
 
@@ -280,13 +377,48 @@
         <h1 id="menuMesaTitulo">Mesa</h1>
         <span></span>
     </div>
-    <div class="filtros" id="filtrosMenu"></div>
+    <div class="menu-nav">
+        <div class="buscador-menu">
+            <i class="fas fa-search"></i>
+            <input type="text" id="buscarProducto" placeholder="Buscar producto…">
+        </div>
+        <div class="filtros" id="filtrosMenu"></div>
+    </div>
     <div class="lista-menu" id="listaMenu"></div>
 
     <div class="barra-resumen" id="barraResumen" hidden>
         <div class="txt" id="resumenTxt"></div>
         <button type="button" id="btnGuardarPedido">Guardar pedido</button>
     </div>
+</div>
+
+<!-- ===== CUPONERA (escanear QR del comensal) ===== -->
+<div class="pantalla" id="cuponScreen">
+    <div class="topbar">
+        <button type="button" class="link-chico" id="btnVolverDeCuponera">&larr; Mesas</button>
+        <h1>Cuponera</h1>
+        <span></span>
+    </div>
+    <div id="readerCupon"></div>
+
+    <div class="resultado-cupon" id="resultadoCupon">
+        <div class="nombre" id="cuponNombre"></div>
+        <div class="visitas" id="cuponVisitas"></div>
+        <div class="gratis-tag" id="cuponGratis" style="display:none;"></div>
+        <button type="button" class="btn-primario" id="btnRegistrarVisitaCupon">Registrar visita</button>
+        <button type="button" class="btn-secundario" id="btnEscanearOtroCupon">Escanear otra tarjeta</button>
+    </div>
+
+    <div class="error-cupon" id="errorCupon">
+        No se encontró ninguna tarjeta con ese código.
+        <br><button type="button" class="btn-secundario" id="btnReintentarCupon" style="margin-top:10px;">Volver a escanear</button>
+    </div>
+
+    <details class="busqueda-cupon-manual">
+        <summary>¿Se le perdió el QR? Buscar por nombre</summary>
+        <input type="text" id="buscarCuponNombre" placeholder="Escribe el nombre…">
+        <div id="resultadosBusquedaCupon"></div>
+    </details>
 </div>
 
 <!-- ===== FICHA DE MESA ===== -->
@@ -303,6 +435,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
     const firebaseConfig = {
         apiKey: "AIzaSyA3D1_bBKQJS2XQa_H0iSyJQ-xl51cj_0Q",
@@ -544,7 +677,13 @@
     });
 
     let filtroActual = 'todos';
+    let busquedaActual = '';
     let pedidoEnCurso = {}; // { nombreProducto: {name, price, qty} }
+
+    document.getElementById('buscarProducto').addEventListener('input', (e) => {
+        busquedaActual = e.target.value.trim().toLowerCase();
+        renderMenuLista(filtroActual);
+    });
 
     document.getElementById('filtrosMenu').addEventListener('click', (e) => {
         const btn = e.target.closest('.filtro-btn');
@@ -557,7 +696,11 @@
 
     function renderMenuLista(filtro) {
         const cont = document.getElementById('listaMenu');
-        const items = menuItems.filter(it => filtro === 'todos' || it.category === filtro);
+        const items = menuItems.filter(it => {
+            const pasaCategoria = filtro === 'todos' || it.category === filtro;
+            const pasaBusqueda = !busquedaActual || it.name.toLowerCase().includes(busquedaActual);
+            return pasaCategoria && pasaBusqueda;
+        });
         cont.innerHTML = items.map(it => {
             const enPedido = pedidoEnCurso[it.name];
             const cant = enPedido ? enPedido.qty : 0;
@@ -616,6 +759,8 @@
         const existentes = (mesasData[num] && mesasData[num].items) || [];
         existentes.forEach(it => { pedidoEnCurso[it.name] = { ...it }; });
 
+        busquedaActual = '';
+        document.getElementById('buscarProducto').value = '';
         document.getElementById('menuMesaTitulo').textContent = 'Mesa ' + num;
         renderMenuLista(filtroActual);
         actualizarBarraResumen();
@@ -647,6 +792,144 @@
             btn.disabled = false;
             btn.textContent = 'Guardar pedido';
         }
+    });
+
+    // ==================================================
+    // CUPONERA — escanear la tarjeta QR del comensal
+    // (mismo mecanismo que ya probamos en mesero.html, integrado aquí)
+    // ==================================================
+    let LOYALTY_THRESHOLD = 7;
+    db.collection('config').doc('general').onSnapshot(doc => {
+        if (doc.exists && doc.data().loyaltyThreshold) LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
+    });
+
+    let idCuponActual = null;
+    let scannerCupon = null;
+    let scannerCuponIniciado = false;
+
+    document.getElementById('btnAbrirCuponera').addEventListener('click', () => {
+        mostrarPantalla('cuponScreen');
+        iniciarScannerCuponSiHaceFalta();
+    });
+    document.getElementById('btnVolverDeCuponera').addEventListener('click', () => {
+        mostrarPantalla('tablesScreen');
+    });
+
+    function iniciarScannerCuponSiHaceFalta() {
+        if (scannerCuponIniciado) return;
+        scannerCuponIniciado = true;
+        scannerCupon = new Html5QrcodeScanner('readerCupon', {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+            rememberLastUsedCamera: true
+        }, false);
+        scannerCupon.render(onScanCuponSuccess, () => { /* se ignoran los fotogramas sin QR */ });
+    }
+
+    function pausarScannerCupon() {
+        document.getElementById('readerCupon').style.display = 'none';
+        scannerCupon.pause(true);
+    }
+    function reanudarScannerCupon() {
+        document.getElementById('resultadoCupon').style.display = 'none';
+        document.getElementById('errorCupon').style.display = 'none';
+        document.getElementById('readerCupon').style.display = 'block';
+        scannerCupon.resume();
+    }
+
+    function onScanCuponSuccess(decodedText) {
+        pausarScannerCupon();
+        buscarTarjetaCupon(decodedText.trim());
+    }
+
+    async function buscarTarjetaCupon(id) {
+        try {
+            const doc = await db.collection('mesaCuponera').doc(id).get();
+            if (!doc.exists) {
+                document.getElementById('errorCupon').style.display = 'block';
+                return;
+            }
+            idCuponActual = id;
+            pintarResultadoCupon(id, doc.data());
+        } catch (err) {
+            console.error('Error buscando la tarjeta:', err);
+            document.getElementById('errorCupon').style.display = 'block';
+        }
+    }
+
+    function pintarResultadoCupon(id, data) {
+        document.getElementById('cuponNombre').textContent = data.nombre;
+        const completados = data.ordersCompleted || 0;
+        const progresoEnCiclo = completados % LOYALTY_THRESHOLD;
+        document.getElementById('cuponVisitas').textContent = `${progresoEnCiclo} de ${LOYALTY_THRESHOLD} visitas`;
+
+        const gratis = data.freeDishesAvailable || 0;
+        const tagGratis = document.getElementById('cuponGratis');
+        if (gratis > 0) {
+            tagGratis.style.display = 'inline-block';
+            tagGratis.textContent = gratis === 1 ? '1 platillo gratis disponible' : `${gratis} platillos gratis disponibles`;
+        } else {
+            tagGratis.style.display = 'none';
+        }
+        document.getElementById('resultadoCupon').style.display = 'block';
+    }
+
+    document.getElementById('btnRegistrarVisitaCupon').addEventListener('click', async () => {
+        if (!idCuponActual) return;
+        const btn = document.getElementById('btnRegistrarVisitaCupon');
+        btn.disabled = true;
+        btn.textContent = 'Registrando…';
+        try {
+            const ref = db.collection('mesaCuponera').doc(idCuponActual);
+            const doc = await ref.get();
+            const data = doc.data();
+            const newCount = (data.ordersCompleted || 0) + 1;
+            const currentFree = data.freeDishesAvailable || 0;
+            const updates = { ordersCompleted: newCount };
+            if (newCount % LOYALTY_THRESHOLD === 0) {
+                updates.freeDishesAvailable = currentFree + 1;
+            }
+            await ref.update(updates);
+            btn.textContent = '¡Visita registrada!';
+            setTimeout(reanudarScannerCupon, 900);
+        } catch (err) {
+            console.error('Error registrando la visita:', err);
+            btn.disabled = false;
+            btn.textContent = 'Registrar visita';
+            alert('No se pudo registrar la visita. Intenta de nuevo.');
+        } finally {
+            setTimeout(() => { btn.disabled = false; btn.textContent = 'Registrar visita'; }, 1000);
+        }
+    });
+
+    document.getElementById('btnEscanearOtroCupon').addEventListener('click', reanudarScannerCupon);
+    document.getElementById('btnReintentarCupon').addEventListener('click', reanudarScannerCupon);
+
+    // Búsqueda manual por nombre (respaldo si el comensal perdió su QR).
+    let tarjetasCuponCache = null;
+    document.getElementById('buscarCuponNombre').addEventListener('input', async (e) => {
+        const texto = e.target.value.trim().toLowerCase();
+        const cont = document.getElementById('resultadosBusquedaCupon');
+        if (!texto) { cont.innerHTML = ''; return; }
+
+        if (!tarjetasCuponCache) {
+            const snap = await db.collection('mesaCuponera').get();
+            tarjetasCuponCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+
+        const coincidencias = tarjetasCuponCache.filter(t => (t.nombre || '').toLowerCase().includes(texto));
+        cont.innerHTML = coincidencias.map(t =>
+            `<div class="resultado-item-cupon" data-id="${t.id}">${t.nombre} — código ${t.id}</div>`
+        ).join('') || '<div style="font-size:13px;color:#a08a5f;">Sin coincidencias</div>';
+
+        cont.querySelectorAll('.resultado-item-cupon').forEach(el => {
+            el.addEventListener('click', () => {
+                const t = tarjetasCuponCache.find(x => x.id === el.dataset.id);
+                idCuponActual = t.id;
+                pausarScannerCupon();
+                pintarResultadoCupon(t.id, t);
+            });
+        });
     });
 </script>
 </body>
