@@ -543,8 +543,7 @@
         <div style="font-size:38px;margin-bottom:6px;">⚠️</div>
         <h2 style="margin-bottom:10px;">Ese nombre ya está registrado</h2>
         <p id="dupNombreTexto" style="font-size:14px;color:#666;line-height:1.5;margin-bottom:18px;text-align:left;"></p>
-        <button type="button" class="btn-primario" id="dupBtnContinuar" style="margin-bottom:10px;">Crear tarjeta de todas formas</button>
-        <button type="button" class="btn-secundario" id="dupBtnCancelar">Mejor cambio el nombre</button>
+        <button type="button" class="btn-primario" id="dupBtnCancelar">Entendido, pongo otro nombre</button>
     </div>
 </div>
 
@@ -1389,7 +1388,7 @@
     function formatearFechaCorta(timestamp) {
         if (!timestamp || !timestamp.toDate) return '';
         const f = timestamp.toDate();
-        return f.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' });
+        return f.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
     document.getElementById('buscarCuponNombre').addEventListener('input', (e) => {
@@ -1435,26 +1434,22 @@
     }
 
     // Modal elegante (en vez del confirm() del navegador) para avisar
-    // cuando el nombre ya existe. Devuelve una promesa: true si el
-    // mesero decide crear la tarjeta de todas formas.
+    // cuando el nombre ya existe. Es un bloqueo real: no se deja crear
+    // la tarjeta hasta que cambien el nombre (para que nunca haya dos
+    // tarjetas con el mismo nombre exacto).
     const dupNombreOverlay = document.getElementById('dupNombreOverlay');
     const dupNombreTexto = document.getElementById('dupNombreTexto');
     const dupBtnCancelar = document.getElementById('dupBtnCancelar');
-    const dupBtnContinuar = document.getElementById('dupBtnContinuar');
-    function preguntarNombreDuplicado(nombre) {
-        dupNombreTexto.innerHTML = `Ya hay alguien registrado como <strong>"${nombre}"</strong>.<br><br>Si es la MISMA persona, cancela esto y mejor búscala arriba en "Buscar por nombre".<br><br>Si es alguien distinto, considera agregar un apellido o apodo (ej. "${nombre} P.") para no confundirlos después.`;
+    function avisarNombreDuplicado(nombre) {
+        dupNombreTexto.innerHTML = `Ya hay alguien registrado como <strong>"${nombre}"</strong>.<br><br>Búscalo arriba en "Buscar por nombre" si es la misma persona, o agrégale un apellido/apodo (ej. "${nombre} P.") si es alguien distinto.`;
         dupNombreOverlay.removeAttribute('hidden');
         return new Promise(resolve => {
-            function limpiar(resultado) {
+            function onCerrar() {
                 dupNombreOverlay.setAttribute('hidden', '');
-                dupBtnCancelar.removeEventListener('click', onCancelar);
-                dupBtnContinuar.removeEventListener('click', onContinuar);
-                resolve(resultado);
+                dupBtnCancelar.removeEventListener('click', onCerrar);
+                resolve();
             }
-            function onCancelar() { limpiar(false); }
-            function onContinuar() { limpiar(true); }
-            dupBtnCancelar.addEventListener('click', onCancelar);
-            dupBtnContinuar.addEventListener('click', onContinuar);
+            dupBtnCancelar.addEventListener('click', onCerrar);
         });
     }
 
@@ -1465,8 +1460,9 @@
 
         const yaExiste = tarjetasCuponCache.some(t => (t.nombre || '').trim().toLowerCase() === nombre.toLowerCase());
         if (yaExiste) {
-            const seguir = await preguntarNombreDuplicado(nombre);
-            if (!seguir) return;
+            await avisarNombreDuplicado(nombre);
+            input.focus();
+            return;
         }
 
         const btn = document.getElementById('btnCrearTarjetaCuponera');
