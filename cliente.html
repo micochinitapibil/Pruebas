@@ -284,8 +284,25 @@
                 return;
             }
             btnCrearTarjeta.disabled = true;
-            btnCrearTarjeta.textContent = 'Creando…';
+            btnCrearTarjeta.textContent = 'Verificando…';
             try {
+                const snap = await db.collection('mesaCuponera').get();
+                const yaExiste = snap.docs.some(d => (d.data().nombre || '').trim().toLowerCase() === nombre.toLowerCase());
+                if (yaExiste) {
+                    const seguir = confirm(
+                        `Ya hay alguien registrado como "${nombre}".\n\n` +
+                        `Si tienes una tarjeta de antes en OTRO celular, mejor usa ese celular (o pide que te ayuden a recuperarla).\n\n` +
+                        `Si eres una persona distinta con el mismo nombre, considera agregar un apellido o apodo (ej. "${nombre} P.") para no confundirte después.\n\n` +
+                        `¿Quieres continuar y crear tu propia tarjeta de todas formas?`
+                    );
+                    if (!seguir) {
+                        btnCrearTarjeta.disabled = false;
+                        btnCrearTarjeta.textContent = 'Crear mi tarjeta';
+                        return;
+                    }
+                }
+
+                btnCrearTarjeta.textContent = 'Creando…';
                 const id = generarId();
                 await db.collection('mesaCuponera').doc(id).set({
                     nombre: nombre,

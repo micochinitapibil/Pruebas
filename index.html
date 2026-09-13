@@ -5240,8 +5240,25 @@
             const nombre = loyaltyQrInputNombre.value.trim();
             if (!nombre) { loyaltyQrInputNombre.focus(); return; }
             loyaltyQrCrearBtn.disabled = true;
-            loyaltyQrCrearBtn.textContent = 'Creando…';
+            loyaltyQrCrearBtn.textContent = 'Verificando…';
             try {
+                const snap = await db.collection('mesaCuponera').get();
+                const yaExiste = snap.docs.some(d => (d.data().nombre || '').trim().toLowerCase() === nombre.toLowerCase());
+                if (yaExiste) {
+                    const seguir = confirm(
+                        `Ya hay alguien registrado como "${nombre}".\n\n` +
+                        `Si ya tienes un código de una visita anterior, mejor pídele al mesero que te ayude a recuperarlo en vez de crear uno nuevo.\n\n` +
+                        `Si eres una persona distinta con el mismo nombre, considera agregar un apellido o apodo (ej. "${nombre} P.") para no confundirte después.\n\n` +
+                        `¿Quieres continuar y crear tu propio código de todas formas?`
+                    );
+                    if (!seguir) {
+                        loyaltyQrCrearBtn.disabled = false;
+                        loyaltyQrCrearBtn.textContent = 'Crear mi código';
+                        return;
+                    }
+                }
+
+                loyaltyQrCrearBtn.textContent = 'Creando…';
                 const id = generarIdLoyaltyQr();
                 await db.collection('mesaCuponera').doc(id).set({
                     nombre: nombre,
