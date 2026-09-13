@@ -272,6 +272,31 @@
     }
     #toast.show { opacity: 1; }
 
+    /* Panel de cumpleaños */
+    .cumple-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 4px;
+        border-bottom: 1px solid #f0e9d6;
+    }
+    .cumple-item:last-child { border-bottom: none; }
+    .cumple-item .info { flex: 1; min-width: 0; }
+    .cumple-item .info .name { font-weight: 700; font-size: 14px; color: var(--dark); }
+    .cumple-item .info .phone { font-size: 12.5px; color: var(--secondary); }
+    .cumple-item .btn-cumple {
+        background: #25D366; color: #fff; border: none; border-radius: 8px;
+        padding: 10px 12px; font-family: inherit; font-weight: 700; font-size: 12px;
+        cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .cumple-item .btn-cumple:active { transform: scale(0.97); }
+    .cumple-item .btn-cumple:disabled {
+        background: #e5ddc8; color: #999; cursor: default;
+    }
+    .cumple-vacio { font-size: 13px; color: #999; padding: 6px 4px; }
+
     /* Modal editar/agregar */
     #productModal {
         display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
@@ -339,6 +364,16 @@
                 Cada vez que un cliente logueado (no invitado) llegue a este número de pedidos entregados, gana un platillo gratis para canjear en su siguiente pedido. Solo puede tener un cupón sin usar a la vez: si ya tiene uno guardado, no se le genera otro hasta que lo use. Marca abajo qué platillos se pueden canjear con "🎁 Disponible para canjear con cupón gratis".
             </p>
             <button class="btn btn-green" id="saveConfigBtn" style="width:100%;">Guardar configuración</button>
+        </div>
+
+        <!-- Cumpleaños de hoy -->
+        <div class="card">
+            <h3>🎂 Hoy cumplen años</h3>
+            <p style="font-size:12px; color:#888; margin-bottom:12px;">
+                Clientes con fecha de nacimiento registrada (por index.html o por un mesero) cuyo cumpleaños es hoy. El botón le regala 1 platillo/bebida gratis en su tarjeta y abre WhatsApp con un mensaje ya escrito para felicitarlo.
+            </p>
+            <div id="cumpleLoading" style="font-size:13px; color:var(--secondary);">Buscando cumpleañeros…</div>
+            <div id="cumpleLista"></div>
         </div>
 
         <!-- Migración inicial -->
@@ -457,6 +492,10 @@
     const db = firebase.firestore();
     const productosRef = db.collection('productos');
     const configRef = db.collection('config').doc('general');
+    // Misma colección "mesaCuponera" que usan index.html y meseros.html —
+    // aquí solo se lee para el panel de cumpleaños y se actualiza el
+    // regalo de cumpleaños (como admin, sin restricción de campos).
+    const cuponeraRef = db.collection('mesaCuponera');
 
     // ==================================================
     // LOGIN / LOGOUT
@@ -485,6 +524,7 @@
             document.getElementById('userEmailLabel').textContent = user.email;
             loadProducts();
             loadConfig();
+            loadCumpleanos();
         } else if (user) {
             // Alguien más (p. ej. un cliente registrado en index.html) intentó entrar aquí
             auth.signOut();
@@ -533,6 +573,95 @@
             .then(() => showToast('Configuración guardada'))
             .catch(err => showToast('Error: ' + err.message));
     });
+
+    // ==================================================
+    // CUMPLEAÑOS DE HOY (tarjetas de mesaCuponera con fechaNacimiento)
+    // El regalo (freeDishesAvailable +1) se marca con ultimoRegaloCumpleAnio
+    // para no volver a regalarlo si el admin recarga la página el mismo día,
+    // ni si por error se le da doble clic al botón.
+    // ==================================================
+    function loadCumpleanos() {
+        const loadingEl = document.getElementById('cumpleLoading');
+        const listaEl = document.getElementById('cumpleLista');
+        loadingEl.style.display = 'block';
+        listaEl.innerHTML = '';
+
+        cuponeraRef.get().then(snapshot => {
+            const hoy = new Date();
+            const mesHoy = hoy.getMonth() + 1;
+            const diaHoy = hoy.getDate();
+            const anioActual = hoy.getFullYear();
+
+            const cumpleaneros = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (!data.fechaNacimiento) return;
+                const partes = String(data.fechaNacimiento).split('-'); // formato "YYYY-MM-DD"
+                if (partes.length !== 3) return;
+                const mes = parseInt(partes[1], 10);
+                const dia = parseInt(partes[2], 10);
+                if (mes === mesHoy && dia === diaHoy) {
+                    cumpleaneros.push({ id: doc.id, ...data });
+                }
+            });
+
+            loadingEl.style.display = 'none';
+            if (!cumpleaneros.length) {
+                listaEl.innerHTML = '<div class="cumple-vacio">Nadie cumple años hoy 🎈</div>';
+                return;
+            }
+
+            listaEl.innerHTML = cumpleaneros.map(c => {
+                const yaRegalado = c.ultimoRegaloCumpleAnio === anioActual;
+                return `<div class="cumple-item">
+                    <div class="info">
+                        <div class="name">${c.nombre || '(sin nombre)'}</div>
+                        <div class="phone">${c.telefono || c.id}</div>
+                    </div>
+                    <button type="button" class="btn-cumple" data-id="${c.id}" ${yaRegalado ? 'disabled' : ''}>
+                        <i class="fab fa-whatsapp"></i> ${yaRegalado ? 'Ya se le dio este año' : 'Regalar y felicitar'}
+                    </button>
+                </div>`;
+            }).join('');
+
+            listaEl.querySelectorAll('.btn-cumple').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const cliente = cumpleaneros.find(c => c.id === btn.dataset.id);
+                    regalarCumpleanos(btn, cliente);
+                });
+            });
+        }).catch(err => {
+            console.error('Error buscando cumpleañeros:', err);
+            loadingEl.textContent = 'No se pudo cargar la lista de cumpleaños.';
+        });
+    }
+
+    async function regalarCumpleanos(btn, cliente) {
+        if (!cliente || btn.disabled) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Regalando…';
+        try {
+            const anioActual = new Date().getFullYear();
+            await cuponeraRef.doc(cliente.id).update({
+                freeDishesAvailable: (cliente.freeDishesAvailable || 0) + 1,
+                ultimoRegaloCumpleAnio: anioActual
+            });
+
+            const telefono = cliente.telefono || cliente.id;
+            const primerNombre = (cliente.nombre || '').trim().split(/\s+/)[0] || '';
+            const mensaje = `🎉 ¡Feliz cumpleaños${primerNombre ? ', ' + primerNombre : ''}! De parte de Cochinita Pibil te regalamos una bebida/platillo gratis — ya quedó guardado en tu tarjeta, solo dísela al mesero en tu próxima visita. ¡Te esperamos para celebrar! 🎂`;
+            const url = `https://wa.me/521${telefono}?text=${encodeURIComponent(mensaje)}`;
+            window.open(url, '_blank');
+
+            btn.innerHTML = '<i class="fab fa-whatsapp"></i> Ya se le dio este año';
+            showToast('Regalo enviado a la tarjeta de ' + (cliente.nombre || telefono));
+        } catch (err) {
+            console.error('Error regalando cumpleaños:', err);
+            showToast('No se pudo dar el regalo: ' + err.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fab fa-whatsapp"></i> Regalar y felicitar';
+        }
+    }
 
     // ==================================================
     // CARGA Y RENDER DE PRODUCTOS
