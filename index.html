@@ -3400,6 +3400,19 @@
         </div>
     </div>
 
+    <!-- MODAL: NOMBRE REPETIDO EN LA CUPONERA (código QR sin cuenta) -->
+    <div class="addons-overlay" id="dupNombreOverlay">
+        <div class="addons-modal" style="text-align:center;">
+            <div style="font-size:42px; margin-bottom:6px;">⚠️</div>
+            <h3>Ese nombre ya está registrado</h3>
+            <p class="addons-subtitle" id="dupNombreTexto"></p>
+            <div class="addons-actions">
+                <button class="addons-skip-btn" id="dupBtnCancelar">Mejor cambio el nombre</button>
+                <button class="addons-continue-btn" id="dupBtnContinuar">Crear el mío de todas formas</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: OFERTA DE CUPÓN GRATIS -->
     <div class="addons-overlay" id="couponOfferOverlay">
         <div class="addons-modal" style="text-align:center;">
@@ -5245,12 +5258,7 @@
                 const snap = await db.collection('mesaCuponera').get();
                 const yaExiste = snap.docs.some(d => (d.data().nombre || '').trim().toLowerCase() === nombre.toLowerCase());
                 if (yaExiste) {
-                    const seguir = confirm(
-                        `Ya hay alguien registrado como "${nombre}".\n\n` +
-                        `Si ya tienes un código de una visita anterior, mejor pídele al mesero que te ayude a recuperarlo en vez de crear uno nuevo.\n\n` +
-                        `Si eres una persona distinta con el mismo nombre, considera agregar un apellido o apodo (ej. "${nombre} P.") para no confundirte después.\n\n` +
-                        `¿Quieres continuar y crear tu propio código de todas formas?`
-                    );
+                    const seguir = await preguntarNombreDuplicado(nombre);
                     if (!seguir) {
                         loyaltyQrCrearBtn.disabled = false;
                         loyaltyQrCrearBtn.textContent = 'Crear mi código';
@@ -5283,6 +5291,30 @@
             loyaltyQrMostrarPasoNombre();
         });
 
+        // Modal elegante (en vez del confirm() del navegador) para avisar
+        // cuando el nombre ya existe. Devuelve una promesa: true si el
+        // cliente decide crear su código de todas formas.
+        const dupNombreOverlay = document.getElementById('dupNombreOverlay');
+        const dupNombreTexto = document.getElementById('dupNombreTexto');
+        const dupBtnCancelar = document.getElementById('dupBtnCancelar');
+        const dupBtnContinuar = document.getElementById('dupBtnContinuar');
+        function preguntarNombreDuplicado(nombre) {
+            dupNombreTexto.innerHTML = `Ya hay alguien registrado como <strong>"${nombre}"</strong>. Si ya tienes un código de una visita anterior, mejor pídele al mesero que te ayude a recuperarlo. Si eres una persona distinta, considera agregar un apellido o apodo (ej. "${nombre} P.") para no confundirte después.`;
+            dupNombreOverlay.classList.add('active');
+            return new Promise(resolve => {
+                function limpiar(resultado) {
+                    dupNombreOverlay.classList.remove('active');
+                    dupBtnCancelar.removeEventListener('click', onCancelar);
+                    dupBtnContinuar.removeEventListener('click', onContinuar);
+                    resolve(resultado);
+                }
+                function onCancelar() { limpiar(false); }
+                function onContinuar() { limpiar(true); }
+                dupBtnCancelar.addEventListener('click', onCancelar);
+                dupBtnContinuar.addEventListener('click', onContinuar);
+            });
+        }
+
         loyaltyFab.addEventListener('click', () => loyaltyModalOverlay.classList.add('active'));
         loyaltyModalClose.addEventListener('click', () => loyaltyModalOverlay.classList.remove('active'));
         loyaltyModalOverlay.addEventListener('click', (e) => {
@@ -5301,7 +5333,7 @@
             const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay',
-                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
+                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
                 'orderModalOverlay', 'loyaltyModalOverlay',
                 ...hiddenBasedIds
             ].map(id => document.getElementById(id)).filter(Boolean);
@@ -5358,7 +5390,7 @@
             const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay',
-                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay',
+                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
                 'orderModalOverlay', 'loyaltyModalOverlay',
                 ...hiddenBasedIds
             ].map(id => document.getElementById(id)).filter(Boolean);
