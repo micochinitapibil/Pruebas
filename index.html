@@ -2250,6 +2250,78 @@
             cursor: not-allowed;
         }
 
+        /* --- Participar sin cuenta (tarjeta con QR, sin login) --- */
+        .loyalty-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 16px 0;
+            color: #b3a281;
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+        .loyalty-divider::before, .loyalty-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(138, 97, 22, 0.2);
+        }
+        .loyalty-qr-toggle-btn {
+            width: 100%;
+            background: transparent;
+            color: var(--secondary);
+            border: 2px dashed rgba(138, 97, 22, 0.35);
+            padding: 12px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.25s ease;
+        }
+        .loyalty-qr-toggle-btn:hover { background: #f8f4e9; border-color: var(--primary); }
+
+        .loyalty-qr-back {
+            background: none;
+            border: none;
+            color: #a08a5f;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            margin-bottom: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        #loyaltyQrPasoNombre input {
+            width: 100%;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-family: inherit;
+            font-size: 15px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+        #loyaltyQrPasoNombre input:focus { outline: none; border-color: var(--secondary); }
+        .loyalty-qr-box {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            display: inline-block;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            margin-bottom: 12px;
+        }
+        .loyalty-qr-box img { display: block; border-radius: 8px; }
+        .loyalty-qr-nombre { font-size: 15px; font-weight: 700; color: var(--dark); margin-bottom: 2px; }
+        .loyalty-qr-id { font-size: 11.5px; letter-spacing: 0.5px; color: #a08a5f; margin-bottom: 4px; }
+        .loyalty-qr-nota { font-size: 12px; color: #a08a5f; line-height: 1.4; margin: 10px 0; }
+
         /* Indicador de cuenta en el header */
         .user-menu {
             position: relative;
@@ -3281,6 +3353,37 @@
                     </svg>
                     Continuar con Google
                 </button>
+
+                <div class="loyalty-divider"><span>o</span></div>
+                <button type="button" class="loyalty-qr-toggle-btn" id="loyaltyQrToggleBtn">
+                    <i class="fas fa-qrcode"></i> Participar sin cuenta — genera tu código
+                </button>
+            </div>
+
+            <!-- Vista para invitados que prefieren un código QR en vez de cuenta -->
+            <div id="loyaltyGuestQrView" hidden>
+                <button type="button" class="loyalty-qr-back" id="loyaltyQrBackBtn"><i class="fas fa-arrow-left"></i> Volver</button>
+
+                <!-- Paso 1: pedir nombre -->
+                <div id="loyaltyQrPasoNombre">
+                    <p>Solo pedimos tu nombre de pila — sin correo ni contraseña. Guarda este código: muéstraselo al mesero cuando quieras registrar tu visita o canjear tu platillo gratis.</p>
+                    <input type="text" id="loyaltyQrInputNombre" placeholder="¿Cómo te llamas?" maxlength="30">
+                    <button type="button" class="google-btn" id="loyaltyQrCrearBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Crear mi código</button>
+                </div>
+
+                <!-- Paso 2: ya tiene tarjeta, se muestra su QR -->
+                <div id="loyaltyQrPasoTarjeta" hidden style="text-align:center;">
+                    <div class="loyalty-qr-box"><img id="loyaltyQrImg" width="170" height="170" alt="Tu código QR"></div>
+                    <div class="loyalty-qr-nombre" id="loyaltyQrNombreTxt"></div>
+                    <div class="loyalty-qr-id" id="loyaltyQrIdTxt"></div>
+
+                    <div class="loyalty-progress-bar"><div class="loyalty-progress-fill" id="loyaltyQrProgressFill" style="width:0%;"></div></div>
+                    <div class="loyalty-progress-text" id="loyaltyQrProgressText"></div>
+                    <div class="loyalty-free-banner" id="loyaltyQrFreeBanner" hidden></div>
+
+                    <div class="loyalty-qr-nota">Muéstrale este código al mesero para registrar tu visita o canjear tu platillo gratis.</div>
+                    <button type="button" class="loyalty-qr-back" id="loyaltyQrReiniciarBtn" style="margin:0;">No soy yo — crear otro código</button>
+                </div>
             </div>
 
             <!-- Vista para clientes logueados -->
@@ -4999,9 +5102,19 @@
         function showLoyaltyGuestView() {
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
             myFreeDishesAvailable = 0;
-            loyaltyGuestView.hidden = false;
             loyaltyUserView.hidden = true;
             loyaltyFabBadge.hidden = true;
+
+            // Si ya tiene un código QR guardado en este navegador, se le
+            // muestra su tarjeta directo (no tiene que volver a elegir).
+            if (localStorage.getItem(LOYALTY_QR_LS_KEY)) {
+                loyaltyGuestView.hidden = true;
+                mostrarLoyaltyQrView();
+                loyaltyQrEscucharTarjeta(localStorage.getItem(LOYALTY_QR_LS_KEY));
+            } else {
+                loyaltyGuestView.hidden = false;
+                loyaltyGuestQrView.hidden = true;
+            }
         }
 
         function startLoyaltyTracking(uid) {
@@ -5030,6 +5143,128 @@
                 }
             }, err => console.error('Error leyendo cuponera:', err));
         }
+
+        // ============================================
+        // CUPONERA SIN CUENTA (código QR) — misma colección "mesaCuponera"
+        // y misma clave de localStorage que usan meseros.html y
+        // cliente.html, para que la tarjeta se reconozca igual sin
+        // importar por dónde se haya creado.
+        // ============================================
+        const loyaltyQrToggleBtn = document.getElementById('loyaltyQrToggleBtn');
+        const loyaltyGuestQrView = document.getElementById('loyaltyGuestQrView');
+        const loyaltyQrBackBtn = document.getElementById('loyaltyQrBackBtn');
+        const loyaltyQrPasoNombre = document.getElementById('loyaltyQrPasoNombre');
+        const loyaltyQrPasoTarjeta = document.getElementById('loyaltyQrPasoTarjeta');
+        const loyaltyQrInputNombre = document.getElementById('loyaltyQrInputNombre');
+        const loyaltyQrCrearBtn = document.getElementById('loyaltyQrCrearBtn');
+        const loyaltyQrReiniciarBtn = document.getElementById('loyaltyQrReiniciarBtn');
+
+        const LOYALTY_QR_LS_KEY = 'mesaQrTarjetaId';
+        const LOYALTY_QR_ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        let loyaltyQrUnsub = null;
+
+        function generarIdLoyaltyQr(largo = 7) {
+            let id = '';
+            for (let i = 0; i < largo; i++) {
+                id += LOYALTY_QR_ALFABETO[Math.floor(Math.random() * LOYALTY_QR_ALFABETO.length)];
+            }
+            return id;
+        }
+
+        function mostrarLoyaltyQrView() {
+            loyaltyGuestView.hidden = true;
+            loyaltyGuestQrView.hidden = false;
+        }
+
+        function loyaltyQrMostrarPasoNombre() {
+            if (loyaltyQrUnsub) { loyaltyQrUnsub(); loyaltyQrUnsub = null; }
+            loyaltyQrPasoTarjeta.hidden = true;
+            loyaltyQrPasoNombre.hidden = false;
+        }
+
+        function loyaltyQrPintarTarjeta(id, data) {
+            document.getElementById('loyaltyQrImg').src =
+                'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(id);
+            document.getElementById('loyaltyQrNombreTxt').textContent = data.nombre;
+            document.getElementById('loyaltyQrIdTxt').textContent = 'Código: ' + id;
+
+            const completed = data.ordersCompleted || 0;
+            const free = data.freeDishesAvailable || 0;
+            const progressInCycle = completed % LOYALTY_THRESHOLD;
+            const pct = Math.round((progressInCycle / LOYALTY_THRESHOLD) * 100);
+
+            document.getElementById('loyaltyQrProgressFill').style.width = pct + '%';
+            document.getElementById('loyaltyQrProgressText').textContent = `${progressInCycle} de ${LOYALTY_THRESHOLD} visitas`;
+
+            const banner = document.getElementById('loyaltyQrFreeBanner');
+            if (free > 0) {
+                banner.hidden = false;
+                banner.textContent = free === 1
+                    ? '🎉 ¡Tienes 1 platillo gratis disponible!'
+                    : `🎉 ¡Tienes ${free} platillos gratis disponibles!`;
+            } else {
+                banner.hidden = true;
+            }
+        }
+
+        function loyaltyQrEscucharTarjeta(id) {
+            if (loyaltyQrUnsub) loyaltyQrUnsub();
+            loyaltyQrPasoNombre.hidden = true;
+            loyaltyQrPasoTarjeta.hidden = false;
+            loyaltyQrUnsub = db.collection('mesaCuponera').doc(id).onSnapshot(doc => {
+                if (!doc.exists) {
+                    localStorage.removeItem(LOYALTY_QR_LS_KEY);
+                    loyaltyQrMostrarPasoNombre();
+                    return;
+                }
+                loyaltyQrPintarTarjeta(id, doc.data());
+            }, err => console.error('Error leyendo tu código de cuponera:', err));
+        }
+
+        loyaltyQrToggleBtn.addEventListener('click', () => {
+            mostrarLoyaltyQrView();
+            if (localStorage.getItem(LOYALTY_QR_LS_KEY)) {
+                loyaltyQrEscucharTarjeta(localStorage.getItem(LOYALTY_QR_LS_KEY));
+            } else {
+                loyaltyQrMostrarPasoNombre();
+            }
+        });
+
+        loyaltyQrBackBtn.addEventListener('click', () => {
+            if (loyaltyQrUnsub) { loyaltyQrUnsub(); loyaltyQrUnsub = null; }
+            loyaltyGuestQrView.hidden = true;
+            loyaltyGuestView.hidden = false;
+        });
+
+        loyaltyQrCrearBtn.addEventListener('click', async () => {
+            const nombre = loyaltyQrInputNombre.value.trim();
+            if (!nombre) { loyaltyQrInputNombre.focus(); return; }
+            loyaltyQrCrearBtn.disabled = true;
+            loyaltyQrCrearBtn.textContent = 'Creando…';
+            try {
+                const id = generarIdLoyaltyQr();
+                await db.collection('mesaCuponera').doc(id).set({
+                    nombre: nombre,
+                    ordersCompleted: 0,
+                    freeDishesAvailable: 0,
+                    creada: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                localStorage.setItem(LOYALTY_QR_LS_KEY, id);
+                loyaltyQrEscucharTarjeta(id);
+            } catch (err) {
+                console.error('Error creando tu código:', err);
+                alert('No se pudo crear tu código. Intenta de nuevo.');
+            } finally {
+                loyaltyQrCrearBtn.disabled = false;
+                loyaltyQrCrearBtn.textContent = 'Crear mi código';
+            }
+        });
+
+        loyaltyQrReiniciarBtn.addEventListener('click', () => {
+            localStorage.removeItem(LOYALTY_QR_LS_KEY);
+            loyaltyQrInputNombre.value = '';
+            loyaltyQrMostrarPasoNombre();
+        });
 
         loyaltyFab.addEventListener('click', () => loyaltyModalOverlay.classList.add('active'));
         loyaltyModalClose.addEventListener('click', () => loyaltyModalOverlay.classList.remove('active'));
