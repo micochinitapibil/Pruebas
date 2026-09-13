@@ -519,14 +519,16 @@
     </div>
 
     <details class="busqueda-cupon-manual">
-        <summary>¿Se le perdió el QR? Buscar por nombre</summary>
-        <input type="text" id="buscarCuponNombre" placeholder="Escribe el nombre…">
+        <summary>¿Se le perdió el QR? Buscar por celular o nombre</summary>
+        <input type="text" id="buscarCuponNombre" placeholder="Escribe el celular o el nombre…">
         <div id="resultadosBusquedaCupon"></div>
     </details>
 
     <details class="busqueda-cupon-manual">
         <summary>¿Es cliente nuevo? Crear su tarjeta</summary>
         <input type="text" id="inputNuevaTarjetaNombre" placeholder="Nombre del cliente…" maxlength="30">
+        <input type="tel" id="inputNuevaTarjetaCelular" placeholder="Celular a 10 dígitos" maxlength="10" inputmode="numeric">
+        <input type="date" id="inputNuevaTarjetaFecha" placeholder="Fecha de nacimiento (opcional)">
         <button type="button" class="btn-primario" id="btnCrearTarjetaCuponera">Crear tarjeta</button>
     </details>
 
@@ -537,13 +539,13 @@
     </div>
 </div>
 
-<!-- ===== AVISO DE NOMBRE REPETIDO EN LA CUPONERA ===== -->
+<!-- ===== AVISO DE CELULAR YA REGISTRADO EN LA CUPONERA ===== -->
 <div class="overlay" id="dupNombreOverlay" hidden>
     <div class="hoja" style="text-align:center;">
-        <div style="font-size:38px;margin-bottom:6px;">⚠️</div>
-        <h2 style="margin-bottom:10px;">Ese nombre ya está registrado</h2>
+        <div style="font-size:38px;margin-bottom:6px;">📱</div>
+        <h2 style="margin-bottom:10px;">Ese celular ya tiene tarjeta</h2>
         <p id="dupNombreTexto" style="font-size:14px;color:#666;line-height:1.5;margin-bottom:18px;text-align:left;"></p>
-        <button type="button" class="btn-primario" id="dupBtnCancelar">Entendido, pongo otro nombre</button>
+        <button type="button" class="btn-primario" id="dupBtnCancelar">Ver su tarjeta</button>
     </div>
 </div>
 
@@ -1391,18 +1393,33 @@
         return f.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
+    // La búsqueda manual ahora acepta celular (parcial o completo, sin
+    // importar espacios/guiones) o nombre — el celular es lo más
+    // confiable porque es el mismo dato con el que se identifica la
+    // tarjeta (su ID en Firestore), así que casi siempre va a encontrarla
+    // aunque el mesero no recuerde bien cómo estaba escrito el nombre.
+    function soloDigitos(valor) {
+        return (valor || '').replace(/\D/g, '');
+    }
+
     document.getElementById('buscarCuponNombre').addEventListener('input', (e) => {
-        const texto = e.target.value.trim().toLowerCase();
+        const textoOriginal = e.target.value.trim();
+        const texto = textoOriginal.toLowerCase();
+        const digitos = soloDigitos(textoOriginal);
         const cont = document.getElementById('resultadosBusquedaCupon');
         if (!texto) { cont.innerHTML = ''; return; }
 
-        const coincidencias = tarjetasCuponCache.filter(t => (t.nombre || '').toLowerCase().includes(texto));
+        const coincidencias = tarjetasCuponCache.filter(t => {
+            const coincideNombre = (t.nombre || '').toLowerCase().includes(texto);
+            const coincideCelular = digitos.length >= 3 && (t.telefono || t.id || '').includes(digitos);
+            return coincideNombre || coincideCelular;
+        });
         cont.innerHTML = coincidencias.map(t => {
             const visitas = t.ordersCompleted || 0;
             const fecha = formatearFechaCorta(t.creada);
             const extra = [`${visitas} visita${visitas === 1 ? '' : 's'}`, fecha ? `desde ${fecha}` : null].filter(Boolean).join(' · ');
             return `<div class="resultado-item-cupon" data-id="${t.id}">
-                <div>${t.nombre} — código ${t.id}</div>
+                <div>${t.nombre || '(sin nombre)'} — cel. ${t.telefono || t.id}</div>
                 <div style="font-size:11.5px;color:#a08a5f;margin-top:2px;">${extra}</div>
             </div>`;
         }).join('') || '<div style="font-size:13px;color:#a08a5f;">Sin coincidencias</div>';
@@ -1419,29 +1436,18 @@
     });
 
     // ==================================================
-    // CREAR TARJETA NUEVA (cliente sin QR propio): el mesero le pone el
-    // nombre y se genera la misma tarjeta que crearía cliente.html, con
-    // su código y su QR — para que quede lista y se pueda escanear o
-    // buscar por nombre la próxima vez que venga.
+    // CREAR TARJETA NUEVA (cliente sin QR propio): el mesero le pide
+    // nombre y celular, y se genera la misma tarjeta que crearía
+    // index.html — identificada por celular (su ID en Firestore), no por
+    // un código aleatorio. Así, si el cliente ya había pedido desde la
+    // página o ya lo había registrado otro mesero, se reconoce como la
+    // misma persona en vez de crear una tarjeta duplicada.
     // ==================================================
-    const ALFABETO_TARJETA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    function generarIdTarjeta(largo = 7) {
-        let id = '';
-        for (let i = 0; i < largo; i++) {
-            id += ALFABETO_TARJETA[Math.floor(Math.random() * ALFABETO_TARJETA.length)];
-        }
-        return id;
-    }
-
-    // Modal elegante (en vez del confirm() del navegador) para avisar
-    // cuando el nombre ya existe. Es un bloqueo real: no se deja crear
-    // la tarjeta hasta que cambien el nombre (para que nunca haya dos
-    // tarjetas con el mismo nombre exacto).
     const dupNombreOverlay = document.getElementById('dupNombreOverlay');
     const dupNombreTexto = document.getElementById('dupNombreTexto');
     const dupBtnCancelar = document.getElementById('dupBtnCancelar');
-    function avisarNombreDuplicado(nombre) {
-        dupNombreTexto.innerHTML = `Ya hay alguien registrado como <strong>"${nombre}"</strong>.<br><br>Búscalo arriba en "Buscar por nombre" si es la misma persona, o agrégale un apellido/apodo (ej. "${nombre} P.") si es alguien distinto.`;
+    function avisarCelularYaRegistrado(nombreExistente) {
+        dupNombreTexto.innerHTML = `Ya hay una tarjeta con ese celular, a nombre de <strong>"${nombreExistente || 'un cliente'}"</strong>.<br><br>Es la misma persona (el celular es su identificador), así que le vamos a mostrar su tarjeta de una vez en lugar de crear otra.`;
         dupNombreOverlay.removeAttribute('hidden');
         return new Promise(resolve => {
             function onCerrar() {
@@ -1454,41 +1460,58 @@
     }
 
     document.getElementById('btnCrearTarjetaCuponera').addEventListener('click', async () => {
-        const input = document.getElementById('inputNuevaTarjetaNombre');
-        const nombre = input.value.trim();
-        if (!nombre) { input.focus(); return; }
-
-        const yaExiste = tarjetasCuponCache.some(t => (t.nombre || '').trim().toLowerCase() === nombre.toLowerCase());
-        if (yaExiste) {
-            await avisarNombreDuplicado(nombre);
-            input.focus();
-            return;
-        }
+        const inputNombre = document.getElementById('inputNuevaTarjetaNombre');
+        const inputCelular = document.getElementById('inputNuevaTarjetaCelular');
+        const inputFecha = document.getElementById('inputNuevaTarjetaFecha');
+        const nombre = inputNombre.value.trim();
+        const celular = soloDigitos(inputCelular.value).slice(-10);
+        const fechaNacimiento = inputFecha.value || null;
+        if (!nombre) { inputNombre.focus(); return; }
+        if (celular.length !== 10) { inputCelular.focus(); return; }
 
         const btn = document.getElementById('btnCrearTarjetaCuponera');
         btn.disabled = true;
-        btn.textContent = 'Creando…';
+        btn.textContent = 'Verificando…';
         try {
             await esperarAuth();
-            const id = generarIdTarjeta();
-            await db.collection('mesaCuponera').doc(id).set({
-                nombre: nombre,
-                ordersCompleted: 0,
-                freeDishesAvailable: 0,
-                creada: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            if (tarjetasCuponCache) tarjetasCuponCache.push({ id, nombre, ordersCompleted: 0, freeDishesAvailable: 0 });
+            const ref = db.collection('mesaCuponera').doc(celular);
+            const doc = await ref.get();
 
-            pausarScannerCupon();
-            document.getElementById('errorCupon').style.display = 'none';
-            document.getElementById('resultadoCupon').style.display = 'none';
+            if (doc.exists) {
+                // Mismo celular = misma persona: no se crea una tarjeta
+                // nueva, se le muestra la que ya tiene.
+                const data = doc.data();
+                await avisarCelularYaRegistrado(data.nombre);
+                pausarScannerCupon();
+                document.getElementById('qrCreacionBox').style.display = 'none';
+                idCuponActual = celular;
+                pintarResultadoCupon(celular, data);
+            } else {
+                btn.textContent = 'Creando…';
+                const nuevaTarjeta = {
+                    nombre: nombre,
+                    telefono: celular,
+                    fechaNacimiento: fechaNacimiento,
+                    ordersCompleted: 0,
+                    freeDishesAvailable: 0,
+                    creada: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                await ref.set(nuevaTarjeta);
+                if (tarjetasCuponCache) tarjetasCuponCache.push({ id: celular, ...nuevaTarjeta });
 
-            document.getElementById('qrCreacionImg').src =
-                'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(id);
-            document.getElementById('qrCreacionTexto').textContent = nombre + ' — código ' + id;
-            document.getElementById('qrCreacionBox').style.display = 'block';
+                pausarScannerCupon();
+                document.getElementById('errorCupon').style.display = 'none';
+                document.getElementById('resultadoCupon').style.display = 'none';
 
-            input.value = '';
+                document.getElementById('qrCreacionImg').src =
+                    'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(celular);
+                document.getElementById('qrCreacionTexto').textContent = nombre + ' — celular ' + celular;
+                document.getElementById('qrCreacionBox').style.display = 'block';
+            }
+
+            inputNombre.value = '';
+            inputCelular.value = '';
+            inputFecha.value = '';
         } catch (err) {
             console.error('Error creando la tarjeta:', err);
             alert('No se pudo crear la tarjeta. Intenta de nuevo.');

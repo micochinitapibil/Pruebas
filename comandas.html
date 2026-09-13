@@ -411,7 +411,11 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     const comandasRef = db.collection('comandas');
-    const clientesRef = db.collection('clientes');
+    // "mesaCuponera" es la misma colección que usan index.html y
+    // meseros.html — la tarjeta de lealtad se identifica por celular
+    // desde la Parte 1. La vieja colección "clientes" (por uid de Google)
+    // ya no se usa: se queda huérfana, pendiente de borrar más adelante.
+    const cuponeraRef = db.collection('mesaCuponera');
 
     let LOYALTY_THRESHOLD = 7; // valor de respaldo mientras carga la configuración real
     db.collection('config').doc('general').onSnapshot(doc => {
@@ -614,20 +618,24 @@
                 showToast('Actualizado a "' + STATUS_LABELS[nextStatus] + '"');
                 if (nextStatus === 'entregado') {
                     const order = allOrders.find(o => o.id === id);
-                    if (order && order.countsForLoyalty && order.uid) {
-                        grantLoyaltyCredit(order.uid);
+                    // El crédito de lealtad ahora depende de tener celular
+                    // registrado (customerPhone), no de haber entrado con
+                    // cuenta de Google (antes se usaba order.uid).
+                    if (order && order.countsForLoyalty && order.customerPhone) {
+                        grantLoyaltyCredit(order.customerPhone);
                     }
                 }
             })
             .catch(err => showToast('Error: ' + err.message));
     }
 
-    // Suma 1 pedido entregado a la cuponera del cliente. Cada vez que junta
+    // Suma 1 pedido entregado a la cuponera del cliente (identificada por
+    // celular, colección mesaCuponera). Cada vez que junta
     // LOYALTY_THRESHOLD pedidos, se le regala un platillo gratis — pero los
     // cupones no son acumulables: si ya tiene uno sin usar, no se le genera
     // otro aunque vuelva a juntar la cantidad de pedidos requerida.
-    function grantLoyaltyCredit(uid) {
-        const clienteRef = clientesRef.doc(uid);
+    function grantLoyaltyCredit(telefono) {
+        const clienteRef = cuponeraRef.doc(telefono);
         db.runTransaction(async (tx) => {
             const doc = await tx.get(clienteRef);
             const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
