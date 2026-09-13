@@ -3340,14 +3340,10 @@
 
             <!-- Vista para invitados / no logueados -->
             <div id="loyaltyGuestView">
-                <p>¿Quieres participar por un platillo gratis? Cada <strong id="loyaltyGuestThreshold">7</strong> pedidos o visitas, ¡el siguiente va por la casa! Tu celular es tu tarjeta: sirve igual si pides aquí o si te atiende el mesero.</p>
+                <p>¿Quieres participar por un platillo gratis? Cada <strong id="loyaltyGuestThreshold">7</strong> pedidos entregados, ¡el siguiente va por la casa! Para empezar a acumular, inicia sesión con tu cuenta de Google.</p>
 
-                <button type="button" class="loyalty-qr-toggle-btn" id="loyaltyQrToggleBtn">
-                    <i class="fas fa-qrcode"></i> Crear o ver mi tarjeta
-                </button>
-
-                <div class="loyalty-divider"><span>o</span></div>
                 <div class="auth-error" id="authError"></div>
+
                 <button type="button" class="google-btn" id="googleSignInBtn">
                     <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
                         <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
@@ -3355,22 +3351,24 @@
                         <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
                         <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
                     </svg>
-                    Iniciar sesión con Google (opcional — para ver tus pedidos desde cualquier dispositivo)
+                    Continuar con Google
+                </button>
+
+                <div class="loyalty-divider"><span>o</span></div>
+                <button type="button" class="loyalty-qr-toggle-btn" id="loyaltyQrToggleBtn">
+                    <i class="fas fa-qrcode"></i> Participar sin cuenta — genera tu código
                 </button>
             </div>
 
-            <!-- Vista de la tarjeta de cuponera (por celular) -->
+            <!-- Vista para invitados que prefieren un código QR en vez de cuenta -->
             <div id="loyaltyGuestQrView" hidden>
-                <button type="button" class="loyalty-qr-back" id="loyaltyQrBackBtn"><i class="fas fa-arrow-left"></i> Cerrar</button>
+                <button type="button" class="loyalty-qr-back" id="loyaltyQrBackBtn"><i class="fas fa-arrow-left"></i> Volver</button>
 
-                <!-- Paso 1: registro de la tarjeta -->
+                <!-- Paso 1: pedir nombre -->
                 <div id="loyaltyQrPasoNombre">
-                    <p>No necesitas correo ni contraseña. Guarda tu código: muéstraselo al mesero (o dale tu celular) cuando quieras registrar tu visita o canjear tu platillo gratis.</p>
-                    <input type="text" id="loyaltyQrInputNombre" placeholder="Nombre completo" maxlength="60">
-                    <input type="tel" id="loyaltyQrInputTelefono" placeholder="Celular a 10 dígitos" maxlength="10" inputmode="numeric">
-                    <input type="date" id="loyaltyQrInputFecha" placeholder="Fecha de nacimiento">
-                    <input type="email" id="loyaltyQrInputCorreo" placeholder="Correo (opcional)">
-                    <button type="button" class="google-btn" id="loyaltyQrCrearBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Crear mi tarjeta</button>
+                    <p>Solo pedimos tu nombre de pila — sin correo ni contraseña. Guarda este código: muéstraselo al mesero cuando quieras registrar tu visita o canjear tu platillo gratis.</p>
+                    <input type="text" id="loyaltyQrInputNombre" placeholder="¿Cómo te llamas?" maxlength="30">
+                    <button type="button" class="google-btn" id="loyaltyQrCrearBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Crear mi código</button>
                 </div>
 
                 <!-- Paso 2: ya tiene tarjeta, se muestra su QR -->
@@ -3447,23 +3445,6 @@
             <div id="addonsList"></div>
             <div class="addons-actions">
                 <button class="addons-main-btn state-skip" id="addonsMainBtn">No gracias, continuar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: ESPEJO POR WHATSAPP DESPUÉS DE UN PEDIDO DIGITAL -->
-    <!-- Este mensaje NO crea un pedido nuevo ni cuenta para la cuponera:
-         el pedido ya quedó registrado en Firestore/comandas. Es solo un
-         aviso extra por WhatsApp para quien reparte, por si no tiene
-         datos para ver la plataforma. -->
-    <div class="addons-overlay" id="mirrorWhatsappOverlay">
-        <div class="addons-modal" style="text-align:center;">
-            <div style="font-size:42px; margin-bottom:6px;">✅</div>
-            <h3>¡Tu pedido ya se envió a cocina!</h3>
-            <p class="addons-subtitle">Para que también le llegue a quien te lo va a entregar, mándanos una copia por WhatsApp (es solo un aviso, tu pedido no se duplica).</p>
-            <div class="addons-actions">
-                <button class="addons-skip-btn" id="mirrorSkipBtn">Cerrar</button>
-                <button class="addons-continue-btn" id="mirrorSendBtn" style="background:#25D366; border-color:#25D366;"><i class="fab fa-whatsapp"></i> Enviar copia por WhatsApp</button>
             </div>
         </div>
     </div>
@@ -3570,7 +3551,7 @@
                 lastSessionKey = 'user:' + user.uid;
                 isGuest = false;
                 updateUserUI(user);
-                showLoyaltyGuestView(); // la cuponera ya no depende de la cuenta de Google, depende del celular
+                startLoyaltyTracking(user.uid);
                 watchMyOrders(user.uid);
             } else if (user && user.isAnonymous) {
                 // Invitado que ya había hecho un pedido digital antes: lo dejamos pasar directo
@@ -4590,57 +4571,6 @@
             if (e.target === addonsOverlay) closeAddonsModal();
         });
 
-        // --- ESPEJO POR WHATSAPP DE UN PEDIDO DIGITAL YA CONFIRMADO ---
-        // Se usa solo como aviso para quien reparte; el pedido real ya
-        // quedó guardado en Firestore antes de mostrar este modal.
-        const mirrorWhatsappOverlay = document.getElementById('mirrorWhatsappOverlay');
-        const mirrorSkipBtn = document.getElementById('mirrorSkipBtn');
-        const mirrorSendBtn = document.getElementById('mirrorSendBtn');
-        let lastDigitalOrderMirrorText = '';
-
-        function buildDigitalOrderMirrorMessage(items, addonsData, orderTypeLocal, tableNumberLocal, feeLocal, totalLocal, deliveryReferenceLocal, deliveryPhoneLocal, deliveryLatLocal, deliveryLngLocal) {
-            let message = '📋 Copia de un pedido YA CONFIRMADO por la app (Mi Cochinita Pibil):\n\n';
-            items.forEach(it => {
-                message += it.freeRedeemed
-                    ? `• ${it.qty}x ${it.name} (gratis — cupón)\n`
-                    : `• ${it.qty}x ${it.name} — ${formatPrice(it.price)}\n`;
-            });
-            if (addonsData.length > 0) {
-                message += '\n➕ Adicionales:\n';
-                addonsData.forEach(a => {
-                    message += `• ${a.qty}x ${a.name} — ${formatPrice(a.price)}\n`;
-                });
-            }
-            if (orderTypeLocal === 'delivery') {
-                message += '\n🛵 Servicio: A domicilio';
-            } else if (orderTypeLocal === 'dine_in') {
-                message += `\n🍽️ Servicio: Comer aquí — Mesa ${tableNumberLocal}`;
-            } else {
-                message += '\n🏠 Servicio: Recoger en el local';
-            }
-            if (feeLocal > 0) message += `\nEnvío: ${formatPrice(feeLocal)}`;
-            message += `\nTotal: ${formatPrice(totalLocal)}`;
-            if (orderTypeLocal === 'delivery') {
-                if (deliveryLatLocal != null) {
-                    message += `\n\n📍 Ubicación: https://maps.google.com/?q=${deliveryLatLocal},${deliveryLngLocal}`;
-                }
-                if (deliveryReferenceLocal) message += `\n🏠 Referencias: ${deliveryReferenceLocal}`;
-                if (deliveryPhoneLocal) message += `\n📞 Contacto: ${deliveryPhoneLocal}`;
-            }
-            message += '\n\n(Este pedido ya está registrado en el sistema — este WhatsApp es solo un aviso para quien entrega)';
-            return message;
-        }
-
-        mirrorSkipBtn.addEventListener('click', () => {
-            mirrorWhatsappOverlay.classList.remove('active');
-        });
-
-        mirrorSendBtn.addEventListener('click', () => {
-            mirrorWhatsappOverlay.classList.remove('active');
-            const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lastDigitalOrderMirrorText)}`;
-            window.open(url, '_blank');
-        });
-
         function sendWhatsAppOrder() {
             let message = '¡Hola Mi Cochinita Pibil! 🐷 Quiero hacer el siguiente pedido:\n\n';
             cart.forEach(c => {
@@ -4737,7 +4667,7 @@
 
         function maybeOfferCoupon() {
             redeemedFreeItem = null;
-            const eligible = !!localStorage.getItem(LOYALTY_QR_LS_KEY) && myFreeDishesAvailable > 0;
+            const eligible = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myFreeDishesAvailable > 0;
             if (eligible) {
                 couponOfferOverlay.classList.add('active');
             } else {
@@ -4860,7 +4790,6 @@
                 }
 
                 const cartSubtotal = cartSnapshot.reduce((sum, c) => sum + parsePrice(c.price) * c.qty, 0);
-                const telefonoTarjeta = localStorage.getItem(LOYALTY_QR_LS_KEY);
 
                 const orderData = {
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -4878,24 +4807,18 @@
                     uid: user.uid,
                     customerEmail: user.isAnonymous ? null : user.email,
                     customerName: user.isAnonymous ? null : (user.displayName || null),
-                    // La tarjeta de lealtad depende de tener celular
-                    // registrado (localStorage), no de haber entrado con
-                    // cuenta de Google — así, un invitado con tarjeta por
-                    // celular sí acumula, y alguien con Google pero sin
-                    // tarjeta registrada no cuenta para la cuponera.
-                    customerPhone: telefonoTarjeta || null,
-                    countsForLoyalty: !!telefonoTarjeta,
+                    countsForLoyalty: !user.isAnonymous,
                     freeDishRedeemed: redeemedFreeItem ? redeemedFreeItem.name : null
                 };
 
                 const newOrderRef = db.collection('comandas').doc();
 
-                if (redeemedFreeItem && telefonoTarjeta) {
+                if (redeemedFreeItem && !user.isAnonymous) {
                     // Transacción: solo se guarda el pedido si el cupón sigue
                     // disponible en ese instante, y se descuenta a la vez
                     // (evita que se use dos veces desde dos pestañas/dispositivos).
                     await db.runTransaction(async (tx) => {
-                        const clienteRef = db.collection('mesaCuponera').doc(telefonoTarjeta);
+                        const clienteRef = db.collection('clientes').doc(user.uid);
                         const clienteDoc = await tx.get(clienteRef);
                         const free = clienteDoc.exists ? (clienteDoc.data().freeDishesAvailable || 0) : 0;
                         if (free < 1) {
@@ -4908,17 +4831,11 @@
                     await newOrderRef.set(orderData);
                 }
 
-                lastDigitalOrderMirrorText = buildDigitalOrderMirrorMessage(
-                    items, addonsData, orderType, tableNumber, fee, orderData.total,
-                    deliveryReference, deliveryPhone, deliveryLat, deliveryLng
-                );
-
                 addonQuantities = {};
                 cart = [];
                 redeemedFreeItem = null;
                 updateCartBadge();
                 closeCart();
-                mirrorWhatsappOverlay.classList.add('active');
                 // No hace falta "activar" nada más aquí: watchMyOrders() ya está
                 // escuchando todos los pedidos de este uid desde que inició sesión,
                 // así que en cuanto Firestore confirme este nuevo documento, el
@@ -5194,17 +5111,14 @@
             loyaltyUserRule.innerHTML = `Cada <strong>${LOYALTY_THRESHOLD}</strong> pedidos entregados ganas un platillo totalmente gratis.`;
         }
 
-        // Puerta de entrada única a la cuponera: se usa para todos (con
-        // cuenta de Google o sin ella), porque el progreso y los cupones
-        // ya no dependen del login, dependen del celular registrado.
         function showLoyaltyGuestView() {
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
             myFreeDishesAvailable = 0;
             loyaltyUserView.hidden = true;
             loyaltyFabBadge.hidden = true;
 
-            // Si ya tiene una tarjeta (celular) guardada en este navegador,
-            // se le muestra directo (no tiene que volver a registrarse).
+            // Si ya tiene un código QR guardado en este navegador, se le
+            // muestra su tarjeta directo (no tiene que volver a elegir).
             if (localStorage.getItem(LOYALTY_QR_LS_KEY)) {
                 loyaltyGuestView.hidden = true;
                 mostrarLoyaltyQrView();
@@ -5212,24 +5126,41 @@
             } else {
                 loyaltyGuestView.hidden = false;
                 loyaltyGuestQrView.hidden = true;
-                // Si ya inició sesión con Google, ese botón sobra aquí.
-                const yaConGoogle = auth.currentUser && !auth.currentUser.isAnonymous;
-                document.querySelector('#loyaltyGuestView .loyalty-divider').hidden = yaConGoogle;
-                googleSignInBtn.hidden = yaConGoogle;
             }
         }
 
-        // NOTA: el sistema viejo de cuponera por cuenta (colección
-        // "clientes", llave = uid de Firebase) ya no se usa — se dejó de
-        // llamar en onAuthStateChanged. La colección "clientes" queda
-        // huérfana; se puede borrar más adelante cuando se confirme que
-        // ya nadie la necesita.
+        function startLoyaltyTracking(uid) {
+            if (clienteUnsub) clienteUnsub();
+            loyaltyGuestView.hidden = true;
+            loyaltyUserView.hidden = false;
+            clienteUnsub = db.collection('clientes').doc(uid).onSnapshot(doc => {
+                const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
+                const completed = data.ordersCompleted || 0;
+                const free = data.freeDishesAvailable || 0;
+                myFreeDishesAvailable = free;
+                const progressInCycle = completed % LOYALTY_THRESHOLD;
+                const pct = Math.round((progressInCycle / LOYALTY_THRESHOLD) * 100);
+
+                loyaltyProgressFill.style.width = pct + '%';
+                loyaltyProgressText.textContent = `${progressInCycle} de ${LOYALTY_THRESHOLD} pedidos`;
+
+                if (free > 0) {
+                    loyaltyFreeBanner.hidden = false;
+                    loyaltyFreeCount.textContent = free;
+                    loyaltyFabBadge.hidden = false;
+                    loyaltyFabBadge.textContent = free;
+                } else {
+                    loyaltyFreeBanner.hidden = true;
+                    loyaltyFabBadge.hidden = true;
+                }
+            }, err => console.error('Error leyendo cuponera:', err));
+        }
 
         // ============================================
-        // CUPONERA UNIFICADA (tarjeta por celular) — misma colección
-        // "mesaCuponera" y misma clave de localStorage que usan
-        // meseros.html y admin.html, para que la tarjeta se reconozca
-        // igual sin importar por dónde se haya creado o consultado.
+        // CUPONERA SIN CUENTA (código QR) — misma colección "mesaCuponera"
+        // y misma clave de localStorage que usan meseros.html y
+        // cliente.html, para que la tarjeta se reconozca igual sin
+        // importar por dónde se haya creado.
         // ============================================
         const loyaltyQrToggleBtn = document.getElementById('loyaltyQrToggleBtn');
         const loyaltyGuestQrView = document.getElementById('loyaltyGuestQrView');
@@ -5237,21 +5168,19 @@
         const loyaltyQrPasoNombre = document.getElementById('loyaltyQrPasoNombre');
         const loyaltyQrPasoTarjeta = document.getElementById('loyaltyQrPasoTarjeta');
         const loyaltyQrInputNombre = document.getElementById('loyaltyQrInputNombre');
-        const loyaltyQrInputTelefono = document.getElementById('loyaltyQrInputTelefono');
-        const loyaltyQrInputFecha = document.getElementById('loyaltyQrInputFecha');
-        const loyaltyQrInputCorreo = document.getElementById('loyaltyQrInputCorreo');
         const loyaltyQrCrearBtn = document.getElementById('loyaltyQrCrearBtn');
         const loyaltyQrReiniciarBtn = document.getElementById('loyaltyQrReiniciarBtn');
 
-        // La tarjeta de cuponera ahora se identifica por celular (variable
-        // "padre" del sistema, según lo acordado con el cliente): el mismo
-        // dato sirve para reconocer al comensal ya sea que pida desde la
-        // página o que el mesero registre su visita en persona.
-        const LOYALTY_QR_LS_KEY = 'mesaQrTarjetaId'; // ahora guarda el celular, no un código aleatorio
+        const LOYALTY_QR_LS_KEY = 'mesaQrTarjetaId';
+        const LOYALTY_QR_ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
         let loyaltyQrUnsub = null;
 
-        function normalizarTelefono(valor) {
-            return (valor || '').replace(/\D/g, '').slice(-10);
+        function generarIdLoyaltyQr(largo = 7) {
+            let id = '';
+            for (let i = 0; i < largo; i++) {
+                id += LOYALTY_QR_ALFABETO[Math.floor(Math.random() * LOYALTY_QR_ALFABETO.length)];
+            }
+            return id;
         }
 
         function mostrarLoyaltyQrView() {
@@ -5269,11 +5198,10 @@
             document.getElementById('loyaltyQrImg').src =
                 'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(id);
             document.getElementById('loyaltyQrNombreTxt').textContent = data.nombre;
-            document.getElementById('loyaltyQrIdTxt').textContent = 'Celular: ' + id;
+            document.getElementById('loyaltyQrIdTxt').textContent = 'Código: ' + id;
 
             const completed = data.ordersCompleted || 0;
             const free = data.freeDishesAvailable || 0;
-            myFreeDishesAvailable = free; // para que el checkout digital sepa si hay cupón disponible
             const progressInCycle = completed % LOYALTY_THRESHOLD;
             const pct = Math.round((progressInCycle / LOYALTY_THRESHOLD) * 100);
 
@@ -5286,11 +5214,8 @@
                 banner.textContent = free === 1
                     ? '🎉 ¡Tienes 1 platillo gratis disponible!'
                     : `🎉 ¡Tienes ${free} platillos gratis disponibles!`;
-                loyaltyFabBadge.hidden = false;
-                loyaltyFabBadge.textContent = free;
             } else {
                 banner.hidden = true;
-                loyaltyFabBadge.hidden = true;
             }
         }
 
@@ -5319,45 +5244,42 @@
 
         loyaltyQrBackBtn.addEventListener('click', () => {
             if (loyaltyQrUnsub) { loyaltyQrUnsub(); loyaltyQrUnsub = null; }
-            loyaltyModalOverlay.classList.remove('active');
+            loyaltyGuestQrView.hidden = true;
+            loyaltyGuestView.hidden = false;
         });
 
         loyaltyQrCrearBtn.addEventListener('click', async () => {
             const nombre = loyaltyQrInputNombre.value.trim();
-            const telefono = normalizarTelefono(loyaltyQrInputTelefono.value);
-            const fechaNacimiento = loyaltyQrInputFecha.value || null;
-            const correo = loyaltyQrInputCorreo.value.trim() || null;
             if (!nombre) { loyaltyQrInputNombre.focus(); return; }
-            if (telefono.length !== 10) { loyaltyQrInputTelefono.focus(); return; }
             loyaltyQrCrearBtn.disabled = true;
             loyaltyQrCrearBtn.textContent = 'Verificando…';
             try {
-                // El celular es el identificador único: si ya existe una
-                // tarjeta con ese número (creada antes desde otro
-                // dispositivo, o por un mesero), la reconocemos como la
-                // misma persona en vez de bloquear o duplicar.
-                const ref = db.collection('mesaCuponera').doc(telefono);
-                const doc = await ref.get();
-                if (!doc.exists) {
-                    loyaltyQrCrearBtn.textContent = 'Creando…';
-                    await ref.set({
-                        nombre: nombre,
-                        telefono: telefono,
-                        fechaNacimiento: fechaNacimiento,
-                        correo: correo,
-                        ordersCompleted: 0,
-                        freeDishesAvailable: 0,
-                        creada: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                const snap = await db.collection('mesaCuponera').get();
+                const yaExiste = snap.docs.some(d => (d.data().nombre || '').trim().toLowerCase() === nombre.toLowerCase());
+                if (yaExiste) {
+                    await avisarNombreDuplicado(nombre);
+                    loyaltyQrCrearBtn.disabled = false;
+                    loyaltyQrCrearBtn.textContent = 'Crear mi código';
+                    loyaltyQrInputNombre.focus();
+                    return;
                 }
-                localStorage.setItem(LOYALTY_QR_LS_KEY, telefono);
-                loyaltyQrEscucharTarjeta(telefono);
+
+                loyaltyQrCrearBtn.textContent = 'Creando…';
+                const id = generarIdLoyaltyQr();
+                await db.collection('mesaCuponera').doc(id).set({
+                    nombre: nombre,
+                    ordersCompleted: 0,
+                    freeDishesAvailable: 0,
+                    creada: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                localStorage.setItem(LOYALTY_QR_LS_KEY, id);
+                loyaltyQrEscucharTarjeta(id);
             } catch (err) {
-                console.error('Error creando tu tarjeta:', err);
-                alert('No se pudo crear tu tarjeta. Intenta de nuevo.');
+                console.error('Error creando tu código:', err);
+                alert('No se pudo crear tu código. Intenta de nuevo.');
             } finally {
                 loyaltyQrCrearBtn.disabled = false;
-                loyaltyQrCrearBtn.textContent = 'Crear mi tarjeta';
+                loyaltyQrCrearBtn.textContent = 'Crear mi código';
             }
         });
 
