@@ -5315,7 +5315,19 @@
                     // por primera vez desde la app, sin haber pasado antes
                     // por una tarjeta física), se crea aquí mismo, para que
                     // ninguna otra cuenta pueda reclamar este número después.
-                    tx.set(cuponeraRef, { telefono, fusionadaConUid: user.uid }, { merge: true });
+                    //
+                    // Si el documento es nuevo, se completa con la misma
+                    // forma que usan meseros.html y el código QR sin cuenta
+                    // (ordersCompleted, freeDishesAvailable, creada) — no
+                    // solo telefono/fusionadaConUid — para que quede igual
+                    // de completo sin importar por dónde se haya originado.
+                    const datosTarjeta = { telefono, fusionadaConUid: user.uid };
+                    if (!yaTeniaTarjetaQr) {
+                        datosTarjeta.ordersCompleted = 0;
+                        datosTarjeta.freeDishesAvailable = 0;
+                        datosTarjeta.creada = firebase.firestore.FieldValue.serverTimestamp();
+                    }
+                    tx.set(cuponeraRef, datosTarjeta, { merge: true });
                 });
 
                 // Se limpia el formulario y se cambia a la vista normal de

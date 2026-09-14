@@ -780,7 +780,17 @@
 
     function confirmarBorrarCliente(uid, etiqueta) {
         if (!confirm(`¿Borrar la cuponera de "${etiqueta}"?\n\nEsto borra su progreso de pedidos, su platillo gratis (si tenía) y su teléfono guardado — no borra su cuenta de Google, así que puede volver a registrar su teléfono después. Esto no se puede deshacer.`)) return;
-        clientesRef.doc(uid).delete()
+        // Antes de borrar la cuenta, se libera cualquier número que haya
+        // quedado "fusionado" con ella en mesaCuponera — si no, ese número
+        // se queda para siempre marcado como perteneciente a una cuenta
+        // que ya no existe, y nadie más podría volver a registrarlo.
+        cuponeraRef.where('fusionadaConUid', '==', uid).get()
+            .then(snap => {
+                const batch = db.batch();
+                snap.forEach(doc => batch.update(doc.ref, { fusionadaConUid: firebase.firestore.FieldValue.delete() }));
+                batch.delete(clientesRef.doc(uid));
+                return batch.commit();
+            })
             .then(() => showToast('Cuponera del cliente eliminada'))
             .catch(err => showToast('Error: ' + err.message));
     }
