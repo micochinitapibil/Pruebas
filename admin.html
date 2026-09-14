@@ -272,6 +272,36 @@
     }
     #toast.show { opacity: 1; }
 
+    /* Cuponera: tarjetas y cuentas */
+    #searchCupon {
+        width: 100%; padding: 12px 14px; border: 2px solid #e5ddc8;
+        border-radius: 8px; font-family: inherit; font-size: 14px; margin-top: 4px;
+    }
+    .cupon-group h4 {
+        font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
+        color: var(--primary); margin: 20px 0 6px; border-bottom: 2px solid var(--light);
+        padding-bottom: 8px;
+    }
+    .cupon-item {
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+        padding: 14px 4px; border-bottom: 1px solid #f0e9d6;
+    }
+    .cupon-item:last-child { border-bottom: none; }
+    .cupon-item.dup {
+        background: #fff5f5; border: 2px solid var(--red); border-radius: 10px;
+        padding: 12px; margin-bottom: 8px; border-bottom: 2px solid var(--red);
+    }
+    .cupon-item .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .cupon-item .info .name { font-weight: 700; font-size: 14px; color: var(--dark); }
+    .cupon-item .info .meta { font-size: 12.5px; color: var(--secondary); }
+    .link-badge {
+        display: inline-block; font-size: 10.5px; font-weight: 700;
+        background: #e6f5ec; color: #2f7a52; padding: 1px 7px; border-radius: 10px; margin-left: 6px;
+    }
+    .link-badge.sin { background: #f0e9d6; color: var(--secondary); }
+    .dup-warning { font-size: 11.5px; font-weight: 700; color: var(--red); margin-top: 2px; }
+    .cupon-empty { font-size: 13px; color: #999; padding: 6px 4px; }
+
     /* Modal editar/agregar */
     #productModal {
         display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
@@ -352,6 +382,25 @@
         <div class="card">
             <h3>➕ Agregar producto nuevo</h3>
             <button class="btn btn-outline" id="openAddModalBtn" style="width:100%;">Agregar producto</button>
+        </div>
+
+        <!-- Cuponera: tarjetas y cuentas -->
+        <div class="card">
+            <h3>🎟️ Cuponera — tarjetas y cuentas</h3>
+            <p style="font-size:12px; color:#888; margin-bottom:12px;">
+                Aquí aparecen todas las tarjetas de cuponera (código QR, con o sin cuenta vinculada) y las cuentas de clientes registrados desde la app. Las que están marcadas en rojo tienen el mismo número o el mismo nombre repetido en otra tarjeta o cuenta — revísalas antes de borrar.
+            </p>
+            <input type="text" id="searchCupon" placeholder="Buscar por nombre o teléfono...">
+            <div id="cuponCountInfo" style="font-size:12px; color:#999; margin:8px 0;"></div>
+
+            <div class="cupon-group">
+                <h4>Tarjetas QR (mesaCuponera)</h4>
+                <div id="cuponeraListWrap"></div>
+            </div>
+            <div class="cupon-group">
+                <h4>Cuentas de clientes (Google)</h4>
+                <div id="clientesListWrap"></div>
+            </div>
         </div>
 
         <!-- Lista -->
@@ -457,6 +506,8 @@
     const db = firebase.firestore();
     const productosRef = db.collection('productos');
     const configRef = db.collection('config').doc('general');
+    const cuponeraRef = db.collection('mesaCuponera');
+    const clientesRef = db.collection('clientes');
 
     // ==================================================
     // LOGIN / LOGOUT
@@ -485,6 +536,7 @@
             document.getElementById('userEmailLabel').textContent = user.email;
             loadProducts();
             loadConfig();
+            loadCuponera();
         } else if (user) {
             // Alguien más (p. ej. un cliente registrado en index.html) intentó entrar aquí
             auth.signOut();
@@ -533,6 +585,155 @@
             .then(() => showToast('Configuración guardada'))
             .catch(err => showToast('Error: ' + err.message));
     });
+
+    // ==================================================
+    // CUPONERA — tarjetas QR (mesaCuponera) y cuentas de
+    // clientes (clientes). Sirve para ver de un vistazo todo
+    // lo que hay en la base de datos, detectar números o
+    // nombres repetidos (de pruebas anteriores, por ejemplo)
+    // y poder borrar lo que ya no sirve.
+    // ==================================================
+    let allTarjetas = [];  // mesaCuponera: doc.id puede ser el teléfono (tarjeta creada por mesero) o un código aleatorio (invitado sin cuenta)
+    let allClientesCupon = []; // clientes: doc.id es el uid de la cuenta de Google
+
+    function loadCuponera() {
+        cuponeraRef.onSnapshot(snap => {
+            allTarjetas = [];
+            snap.forEach(doc => allTarjetas.push({ id: doc.id, ...doc.data() }));
+            renderCuponPanel();
+        }, err => {
+            console.error(err);
+            showToast('Error leyendo tarjetas de cuponera: ' + err.message);
+        });
+
+        clientesRef.onSnapshot(snap => {
+            allClientesCupon = [];
+            snap.forEach(doc => allClientesCupon.push({ id: doc.id, ...doc.data() }));
+            renderCuponPanel();
+        }, err => {
+            console.error(err);
+            showToast('Error leyendo cuentas de clientes: ' + err.message);
+        });
+    }
+
+    // Un mismo número no debería repetirse ni entre tarjetas QR ni
+    // entre cuentas de cliente, así que se cuenta cruzando ambas listas.
+    function contarTelefonosRepetidos() {
+        const counts = {};
+        allTarjetas.forEach(t => {
+            const tel = (t.telefono || (/^\d{10}$/.test(t.id) ? t.id : '')).trim();
+            if (tel) counts[tel] = (counts[tel] || 0) + 1;
+        });
+        allClientesCupon.forEach(c => {
+            const tel = (c.telefono || '').trim();
+            if (tel) counts[tel] = (counts[tel] || 0) + 1;
+        });
+        return counts;
+    }
+
+    function contarNombresRepetidos(lista) {
+        const counts = {};
+        lista.forEach(item => {
+            const n = (item.nombre || '').trim().toLowerCase();
+            if (n) counts[n] = (counts[n] || 0) + 1;
+        });
+        return counts;
+    }
+
+    function cuponCoincideBusqueda(search, nombre, telefono, id) {
+        if (!search) return true;
+        return (nombre || '').toLowerCase().includes(search) ||
+               (telefono || '').includes(search) ||
+               (id || '').toLowerCase().includes(search);
+    }
+
+    function renderCuponPanel() {
+        const search = document.getElementById('searchCupon').value.trim().toLowerCase();
+        const dupTelefonos = contarTelefonosRepetidos();
+        const dupNombresTarjetas = contarNombresRepetidos(allTarjetas);
+        const dupNombresClientes = contarNombresRepetidos(allClientesCupon);
+
+        const tarjetasFiltradas = allTarjetas.filter(t =>
+            cuponCoincideBusqueda(search, t.nombre, t.telefono || t.id, t.id));
+        const clientesFiltrados = allClientesCupon.filter(c =>
+            cuponCoincideBusqueda(search, c.nombre, c.telefono, c.id));
+
+        document.getElementById('cuponCountInfo').textContent =
+            `${tarjetasFiltradas.length} tarjeta(s) QR · ${clientesFiltrados.length} cuenta(s) de cliente`;
+
+        // ---- Tarjetas QR (mesaCuponera) ----
+        const wrapT = document.getElementById('cuponeraListWrap');
+        wrapT.innerHTML = '';
+        if (tarjetasFiltradas.length === 0) {
+            wrapT.innerHTML = '<div class="cupon-empty">Sin resultados.</div>';
+        }
+        tarjetasFiltradas.forEach(t => {
+            const telefonoMostrado = t.telefono || (/^\d{10}$/.test(t.id) ? t.id : '');
+            const esDupTel = telefonoMostrado && dupTelefonos[telefonoMostrado] > 1;
+            const esDupNombre = t.nombre && dupNombresTarjetas[t.nombre.trim().toLowerCase()] > 1;
+            const vinculada = !!t.fusionadaConUid;
+            const row = document.createElement('div');
+            row.className = 'cupon-item' + ((esDupTel || esDupNombre) ? ' dup' : '');
+            row.innerHTML = `
+                <div class="info">
+                    <div class="name">${t.nombre || '(sin nombre)'} ${vinculada
+                        ? '<span class="link-badge">🔗 cuenta vinculada</span>'
+                        : '<span class="link-badge sin">sin cuenta</span>'}</div>
+                    <div class="meta">${telefonoMostrado ? '📱 ' + telefonoMostrado : 'Código: ' + t.id}</div>
+                    <div class="meta">${t.ordersCompleted || 0} pedidos · ${t.freeDishesAvailable || 0} gratis disponible(s)</div>
+                    ${esDupTel ? '<div class="dup-warning">⚠ Número repetido en otra tarjeta o cuenta</div>' : ''}
+                    ${esDupNombre ? '<div class="dup-warning">⚠ Nombre repetido en otra tarjeta</div>' : ''}
+                </div>
+                <button class="icon-btn del" title="Borrar tarjeta"><i class="fas fa-trash"></i></button>
+            `;
+            row.querySelector('.icon-btn.del').addEventListener('click', () =>
+                confirmarBorrarTarjeta(t.id, t.nombre || telefonoMostrado || t.id));
+            wrapT.appendChild(row);
+        });
+
+        // ---- Cuentas de clientes (Google) ----
+        const wrapC = document.getElementById('clientesListWrap');
+        wrapC.innerHTML = '';
+        if (clientesFiltrados.length === 0) {
+            wrapC.innerHTML = '<div class="cupon-empty">Sin resultados.</div>';
+        }
+        clientesFiltrados.forEach(c => {
+            const esDupTel = c.telefono && dupTelefonos[c.telefono] > 1;
+            const esDupNombre = c.nombre && dupNombresClientes[c.nombre.trim().toLowerCase()] > 1;
+            const row = document.createElement('div');
+            row.className = 'cupon-item' + ((esDupTel || esDupNombre) ? ' dup' : '');
+            row.innerHTML = `
+                <div class="info">
+                    <div class="name">${c.nombre || '(sin nombre)'} <span class="link-badge">🔗 cuenta de Google</span></div>
+                    <div class="meta">${c.telefono ? '📱 ' + c.telefono : 'Sin teléfono guardado'}</div>
+                    <div class="meta">${c.ordersCompleted || 0} pedidos · ${c.freeDishesAvailable || 0} gratis disponible(s)</div>
+                    <div class="meta" style="font-size:11px; opacity:.6;">UID: ${c.id}</div>
+                    ${esDupTel ? '<div class="dup-warning">⚠ Número repetido en otra tarjeta o cuenta</div>' : ''}
+                    ${esDupNombre ? '<div class="dup-warning">⚠ Nombre repetido en otra cuenta</div>' : ''}
+                </div>
+                <button class="icon-btn del" title="Borrar cuponera"><i class="fas fa-trash"></i></button>
+            `;
+            row.querySelector('.icon-btn.del').addEventListener('click', () =>
+                confirmarBorrarCliente(c.id, c.nombre || c.telefono || c.id));
+            wrapC.appendChild(row);
+        });
+    }
+
+    document.getElementById('searchCupon').addEventListener('input', renderCuponPanel);
+
+    function confirmarBorrarTarjeta(id, etiqueta) {
+        if (!confirm(`¿Borrar la tarjeta de "${etiqueta}"?\n\nSi alguien todavía tiene guardado este código QR en su celular, dejará de funcionar. Esto no se puede deshacer.`)) return;
+        cuponeraRef.doc(id).delete()
+            .then(() => showToast('Tarjeta eliminada'))
+            .catch(err => showToast('Error: ' + err.message));
+    }
+
+    function confirmarBorrarCliente(uid, etiqueta) {
+        if (!confirm(`¿Borrar la cuponera de "${etiqueta}"?\n\nEsto borra su progreso de pedidos, su platillo gratis (si tenía) y su teléfono guardado — no borra su cuenta de Google, así que puede volver a registrar su teléfono después. Esto no se puede deshacer.`)) return;
+        clientesRef.doc(uid).delete()
+            .then(() => showToast('Cuponera del cliente eliminada'))
+            .catch(err => showToast('Error: ' + err.message));
+    }
 
     // ==================================================
     // CARGA Y RENDER DE PRODUCTOS
