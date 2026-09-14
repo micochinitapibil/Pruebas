@@ -647,15 +647,34 @@
 
     // Un mismo número no debería repetirse ni entre tarjetas QR ni
     // entre cuentas de cliente, así que se cuenta cruzando ambas listas.
+    // Un par tarjeta+cuenta correctamente vinculado entre sí (mismo
+    // teléfono, fusionadaConUid == uid de la cuenta) es el caso normal
+    // y NO cuenta como repetido — solo se marca cuando sobran tarjetas,
+    // sobran cuentas, o el vínculo no coincide.
     function contarTelefonosRepetidos() {
-        const counts = {};
+        const porTelefono = {};
         allTarjetas.forEach(t => {
             const tel = (t.telefono || (/^\d{10}$/.test(t.id) ? t.id : '')).trim();
-            if (tel) counts[tel] = (counts[tel] || 0) + 1;
+            if (!tel) return;
+            if (!porTelefono[tel]) porTelefono[tel] = { tarjetas: [], clientes: [] };
+            porTelefono[tel].tarjetas.push(t);
         });
         allClientesCupon.forEach(c => {
             const tel = (c.telefono || '').trim();
-            if (tel) counts[tel] = (counts[tel] || 0) + 1;
+            if (!tel) return;
+            if (!porTelefono[tel]) porTelefono[tel] = { tarjetas: [], clientes: [] };
+            porTelefono[tel].clientes.push(c);
+        });
+
+        const counts = {};
+        Object.keys(porTelefono).forEach(tel => {
+            const { tarjetas, clientes } = porTelefono[tel];
+            const esParVinculadoNormal =
+                tarjetas.length === 1 &&
+                clientes.length === 1 &&
+                tarjetas[0].fusionadaConUid === clientes[0].id;
+
+            counts[tel] = esParVinculadoNormal ? 1 : (tarjetas.length + clientes.length);
         });
         return counts;
     }
