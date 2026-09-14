@@ -501,6 +501,7 @@
 
     <div class="resultado-cupon" id="resultadoCupon">
         <div class="nombre" id="cuponNombre"></div>
+        <div id="cuponDetalle" style="font-size:13px;color:#a08a5f;margin:-6px 0 6px;"></div>
         <div class="visitas" id="cuponVisitas"></div>
         <div class="gratis-tag" id="cuponGratis" style="display:none;"></div>
 
@@ -1267,7 +1268,17 @@
     }
 
     function pintarResultadoCupon(id, data) {
-        document.getElementById('cuponNombre').textContent = data.telefono || data.nombre || id;
+        // Nombre como título si existe; si no, el teléfono. Debajo, en
+        // una sola línea, lo que falte (teléfono y/o fecha de nacimiento)
+        // sin repetir el mismo dato dos veces.
+        const telefono = data.telefono || id;
+        document.getElementById('cuponNombre').textContent = data.nombre || telefono;
+
+        const detalles = [];
+        if (data.nombre) detalles.push(`📱 ${telefono}`);
+        const fechaNac = formatearFechaNacimiento(data.fechaNacimiento);
+        if (fechaNac) detalles.push(`🎂 ${fechaNac}`);
+        document.getElementById('cuponDetalle').textContent = detalles.join('   ·   ');
         const completados = data.ordersCompleted || 0;
         const progresoEnCiclo = completados % LOYALTY_THRESHOLD;
         document.getElementById('cuponVisitas').textContent = `${progresoEnCiclo} de ${LOYALTY_THRESHOLD} visitas`;
@@ -1395,6 +1406,15 @@
         return f.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
+    // La fecha de nacimiento se guarda como texto "YYYY-MM-DD" (lo que
+    // entrega el input type="date"), aquí solo se muestra bonita.
+    function formatearFechaNacimiento(fechaTexto) {
+        if (!fechaTexto) return '';
+        const [anio, mes, dia] = fechaTexto.split('-');
+        if (!anio || !mes || !dia) return '';
+        return `${dia}/${mes}/${anio}`;
+    }
+
     document.getElementById('buscarCuponNombre').addEventListener('input', (e) => {
         const texto = e.target.value.trim().toLowerCase();
         const cont = document.getElementById('resultadosBusquedaCupon');
@@ -1407,9 +1427,16 @@
             const visitas = t.ordersCompleted || 0;
             const fecha = formatearFechaCorta(t.creada);
             const extra = [`${visitas} visita${visitas === 1 ? '' : 's'}`, fecha ? `desde ${fecha}` : null].filter(Boolean).join(' · ');
-            const etiqueta = t.telefono || t.nombre || t.id;
+            // Nombre, teléfono y fecha de nacimiento, cada uno en su
+            // propia línea y sin repetir el número como "código" cuando
+            // ya es lo mismo que el ID de la tarjeta.
+            const lineas = [];
+            if (t.nombre) lineas.push(t.nombre);
+            lineas.push(`📱 ${t.telefono || t.id}`);
+            const fechaNac = formatearFechaNacimiento(t.fechaNacimiento);
+            if (fechaNac) lineas.push(`🎂 ${fechaNac}`);
             return `<div class="resultado-item-cupon" data-id="${t.id}">
-                <div>${etiqueta} — código ${t.id}</div>
+                <div>${lineas.join(' · ')}</div>
                 <div style="font-size:11.5px;color:#a08a5f;margin-top:2px;">${extra}</div>
             </div>`;
         }).join('') || '<div style="font-size:13px;color:#a08a5f;">Sin coincidencias</div>';
