@@ -528,6 +528,9 @@
         <summary>¿Es cliente nuevo? Crear su tarjeta</summary>
         <input type="tel" id="inputNuevaTarjetaTelefono" placeholder="Número de celular (10 dígitos)" maxlength="10" inputmode="numeric" autocomplete="off">
         <div class="error-tarjeta-telefono" id="errorNuevaTarjetaTelefono" style="display:none;color:var(--red);font-size:12.5px;font-weight:600;margin:-4px 0 8px;"></div>
+        <input type="text" id="inputNuevaTarjetaNombreOpcional" placeholder="Nombre (opcional)" maxlength="40" autocomplete="off" style="margin-top:2px;">
+        <input type="date" id="inputNuevaTarjetaFechaNacimiento" placeholder="Fecha de nacimiento (opcional)" style="margin-top:8px;">
+        <div style="font-size:11.5px;color:#a08a5f;margin:-4px 0 10px;">Nombre y fecha de nacimiento son opcionales</div>
         <button type="button" class="btn-primario" id="btnCrearTarjetaCuponera">Crear tarjeta</button>
     </details>
 
@@ -1466,6 +1469,12 @@
         const input = inputTelefonoTarjeta;
         const errorTxt = document.getElementById('errorNuevaTarjetaTelefono');
         const telefono = input.value.replace(/\D/g, '');
+        // Nombre y fecha de nacimiento son opcionales: se guardan solo si
+        // el mesero los llenó.
+        const inputNombreOpcional = document.getElementById('inputNuevaTarjetaNombreOpcional');
+        const inputFechaNacimiento = document.getElementById('inputNuevaTarjetaFechaNacimiento');
+        const nombreOpcional = inputNombreOpcional.value.trim();
+        const fechaNacimiento = inputFechaNacimiento.value; // formato YYYY-MM-DD o vacío
 
         if (telefono.length !== 10) {
             errorTxt.textContent = 'El número debe tener exactamente 10 dígitos.';
@@ -1493,13 +1502,17 @@
                 return;
             }
 
-            await ref.set({
+            const datosTarjeta = {
                 telefono: telefono,
                 ordersCompleted: 0,
                 freeDishesAvailable: 0,
                 creada: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            if (tarjetasCuponCache) tarjetasCuponCache.push({ id: telefono, telefono, ordersCompleted: 0, freeDishesAvailable: 0 });
+            };
+            if (nombreOpcional) datosTarjeta.nombre = nombreOpcional;
+            if (fechaNacimiento) datosTarjeta.fechaNacimiento = fechaNacimiento;
+
+            await ref.set(datosTarjeta);
+            if (tarjetasCuponCache) tarjetasCuponCache.push({ id: telefono, telefono, nombre: nombreOpcional || undefined, fechaNacimiento: fechaNacimiento || undefined, ordersCompleted: 0, freeDishesAvailable: 0 });
 
             pausarScannerCupon();
             document.getElementById('errorCupon').style.display = 'none';
@@ -1507,10 +1520,12 @@
 
             document.getElementById('qrCreacionImg').src =
                 'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(telefono);
-            document.getElementById('qrCreacionTexto').textContent = 'Tarjeta del ' + telefono;
+            document.getElementById('qrCreacionTexto').textContent = (nombreOpcional || 'Tarjeta del ' + telefono);
             document.getElementById('qrCreacionBox').style.display = 'block';
 
             input.value = '';
+            inputNombreOpcional.value = '';
+            inputFechaNacimiento.value = '';
         } catch (err) {
             console.error('Error creando la tarjeta:', err);
             alert('No se pudo crear la tarjeta. Intenta de nuevo.');
