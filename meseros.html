@@ -581,6 +581,7 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+    const clientesRef = db.collection('clientes');
 
     // ==================================================
     // AUTENTICACIÓN ANÓNIMA
@@ -1337,8 +1338,19 @@
             }
             // Se descuenta de inmediato para evitar que se aplique dos
             // veces por accidente si el mesero toca el botón otra vez.
-            await ref.update({ freeDishesAvailable: actuales - 1 });
-            sincronizarCacheCupon(tarjetaId, { freeDishesAvailable: actuales - 1 });
+            // Si la tarjeta está vinculada a una cuenta, se descuenta
+            // también en clientes/{uid} — es la fuente real que ve el
+            // cliente en la app, así que tiene que quedar igual.
+            const nuevoValor = actuales - 1;
+            if (data.fusionadaConUid) {
+                const batch = db.batch();
+                batch.update(ref, { freeDishesAvailable: nuevoValor });
+                batch.update(clientesRef.doc(data.fusionadaConUid), { freeDishesAvailable: nuevoValor });
+                await batch.commit();
+            } else {
+                await ref.update({ freeDishesAvailable: nuevoValor });
+            }
+            sincronizarCacheCupon(tarjetaId, { freeDishesAvailable: nuevoValor });
 
             const key = 'GRATIS::' + nombrePlatillo + '::' + Date.now();
             pedidoEnCurso[key] = { name: nombrePlatillo, price: 0, qty: 1, gratis: true, tarjetaId: tarjetaId };
@@ -1373,7 +1385,17 @@
             if (newCount % LOYALTY_THRESHOLD === 0 && currentFree === 0) {
                 updates.freeDishesAvailable = currentFree + 1;
             }
-            await ref.update(updates);
+            // Si la tarjeta está vinculada a una cuenta, se refleja la
+            // misma visita en clientes/{uid} — es la fuente real que ve
+            // el cliente en su app.
+            if (data.fusionadaConUid) {
+                const batch = db.batch();
+                batch.update(ref, updates);
+                batch.update(clientesRef.doc(data.fusionadaConUid), updates);
+                await batch.commit();
+            } else {
+                await ref.update(updates);
+            }
             sincronizarCacheCupon(idCuponActual, updates);
             pintarResultadoCupon(idCuponActual, { ...data, ...updates });
             btn.textContent = '¡Visita registrada!';
@@ -1522,9 +1544,44 @@
             // al mismo tiempo.
             const existente = await ref.get();
             if (existente.exists) {
+                const datosExistente = existente.data();
+                if (datosExistente.fusionadaConUid) {
+                    // Este número ya es la cuenta de un cliente que se
+                    // registró desde la app — no es un choque real, es
+                    // la misma persona. En vez de bloquear, se completa
+                    // el nombre/fecha si el mesero los apuntó y faltaban,
+                    // y se muestra su QR (que ya existía) listo para
+                    // imprimir/mostrar.
+                    const actualizaciones = {};
+                    if (nombreOpcional && !datosExistente.nombre) actualizaciones.nombre = nombreOpcional;
+                    if (fechaNacimiento && !datosExistente.fechaNacimiento) actualizaciones.fechaNacimiento = fechaNacimiento;
+                    if (Object.keys(actualizaciones).length) {
+                        await ref.update(actualizaciones);
+                        Object.assign(datosExistente, actualizaciones);
+                        sincronizarCacheCupon(telefono, actualizaciones);
+                    }
+
+                    pausarScannerCupon();
+                    document.getElementById('errorCupon').style.display = 'none';
+                    document.getElementById('resultadoCupon').style.display = 'none';
+
+                    document.getElementById('qrCreacionImg').src =
+                        'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(telefono);
+                    document.getElementById('qrCreacionTexto').textContent = (datosExistente.nombre || 'Tarjeta del ' + telefono);
+                    document.getElementById('qrCreacionBox').style.display = 'block';
+
+                    input.value = '';
+                    inputNombreOpcional.value = '';
+                    inputFechaNacimiento.value = '';
+                    return;
+                }
+
+                // Tarjeta sin cuenta vinculada (de otra visita o prueba
+                // anterior): este sí es un choque real, se sigue
+                // bloqueando para no perder su progreso por accidente.
                 btn.disabled = false;
                 btn.textContent = 'Crear tarjeta';
-                await avisarTelefonoDuplicado(telefono, existente.data().nombre);
+                await avisarTelefonoDuplicado(telefono, datosExistente.nombre);
                 input.focus();
                 return;
             }

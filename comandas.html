@@ -626,6 +626,12 @@
     // LOYALTY_THRESHOLD pedidos, se le regala un platillo gratis — pero los
     // cupones no son acumulables: si ya tiene uno sin usar, no se le genera
     // otro aunque vuelva a juntar la cantidad de pedidos requerida.
+    //
+    // clientes/{uid} es la fuente real. Si esta cuenta ya tiene una
+    // tarjeta QR vinculada (mesaCuponera con fusionadaConUid == uid),
+    // se actualiza también en espejo con los mismos números, para que
+    // lo que vea el mesero al escanear coincida siempre con lo que ve
+    // el cliente en la app — sin importar por dónde se haya sumado.
     function grantLoyaltyCredit(uid) {
         const clienteRef = clientesRef.doc(uid);
         db.runTransaction(async (tx) => {
@@ -633,14 +639,29 @@
             const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
             const newCount = (data.ordersCompleted || 0) + 1;
             const currentFree = data.freeDishesAvailable || 0;
+            let newFree = currentFree;
             const updates = {
                 ordersCompleted: newCount,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             if (newCount % LOYALTY_THRESHOLD === 0 && currentFree < 1) {
-                updates.freeDishesAvailable = currentFree + 1;
+                newFree = currentFree + 1;
+                updates.freeDishesAvailable = newFree;
             }
+
+            let tarjetaRef = null;
+            if (data.telefono) {
+                tarjetaRef = db.collection('mesaCuponera').doc(data.telefono);
+                const tarjetaDoc = await tx.get(tarjetaRef);
+                if (!tarjetaDoc.exists || tarjetaDoc.data().fusionadaConUid !== uid) {
+                    tarjetaRef = null;
+                }
+            }
+
             tx.set(clienteRef, updates, { merge: true });
+            if (tarjetaRef) {
+                tx.set(tarjetaRef, { ordersCompleted: newCount, freeDishesAvailable: newFree }, { merge: true });
+            }
         }).catch(err => console.error('Error actualizando cuponera:', err));
     }
 
