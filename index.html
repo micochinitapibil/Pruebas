@@ -3558,17 +3558,28 @@
         // el modal como antes; si no, se muestra el formulario para
         // pedirlo (obligatorio) junto con nombre y fecha de nacimiento
         // (opcionales) antes de cerrar el modal.
-        async function revisarYPedirTelefono(uid) {
+        //
+        // cerrarModalSiYaTiene=false se usa cuando el modal se abre desde
+        // el botón flotante (no justo después de loguearse): en vez de
+        // cerrarlo de golpe, muestra la vista normal de cuponera (progreso
+        // / platillos gratis) en lugar de dejar "atorado" el formulario de
+        // teléfono con los datos de la última vez que se llenó.
+        async function revisarYPedirTelefono(uid, cerrarModalSiYaTiene = true) {
             try {
                 const doc = await db.collection('clientes').doc(uid).get();
                 if (doc.exists && doc.data().telefono) {
-                    loyaltyModalOverlay.classList.remove('active');
+                    if (cerrarModalSiYaTiene) {
+                        loyaltyModalOverlay.classList.remove('active');
+                    } else {
+                        loyaltyPhoneAskView.hidden = true;
+                        startLoyaltyTracking(uid);
+                    }
                 } else {
                     mostrarLoyaltyPhoneAskView();
                 }
             } catch (err) {
                 console.error('Error revisando el teléfono guardado:', err);
-                loyaltyModalOverlay.classList.remove('active');
+                if (cerrarModalSiYaTiene) loyaltyModalOverlay.classList.remove('active');
             }
         }
 
@@ -5262,11 +5273,21 @@
                 await db.runTransaction(async tx => {
                     const [clienteDoc, cuponeraDoc] = await Promise.all([tx.get(clienteRef), tx.get(cuponeraRef)]);
 
+                    // mesaCuponera/{telefono} es el registro único de "a qué
+                    // cuenta le pertenece este número" (ya sea porque se creó
+                    // como tarjeta física en meseros.html, o porque otra
+                    // cuenta ya lo guardó antes desde la app). Si ya está
+                    // fusionado con OTRA cuenta, no se deja continuar.
+                    const yaTeniaTarjetaQr = cuponeraDoc.exists;
+                    const dueñoActual = yaTeniaTarjetaQr ? cuponeraDoc.data().fusionadaConUid : null;
+                    if (dueñoActual && dueñoActual !== user.uid) {
+                        throw new Error('TELEFONO_DUPLICADO');
+                    }
+
                     // Si ya existe una tarjeta de QR con este mismo número,
                     // se suma su progreso (visitas y platillos gratis) al
                     // que la cuenta ya traiga — así se reconoce que es la
                     // misma persona y no se pierde nada de ningún lado.
-                    const yaTeniaTarjetaQr = cuponeraDoc.exists;
                     const ordersPrevios = clienteDoc.exists ? (clienteDoc.data().ordersCompleted || 0) : 0;
                     const gratisPrevios = clienteDoc.exists ? (clienteDoc.data().freeDishesAvailable || 0) : 0;
                     const ordersTarjeta = yaTeniaTarjetaQr ? (cuponeraDoc.data().ordersCompleted || 0) : 0;
@@ -5281,19 +5302,34 @@
 
                     tx.set(clienteRef, datosCliente, { merge: true });
 
-                    // Se marca la tarjeta de QR como fusionada con esta
-                    // cuenta (no se borra: sigue sirviendo si el mesero la
-                    // escanea), para que no la pueda "reclamar" otra cuenta.
-                    if (yaTeniaTarjetaQr && !cuponeraDoc.data().fusionadaConUid) {
-                        tx.update(cuponeraRef, { fusionadaConUid: user.uid });
-                    }
+                    // Se marca (o confirma) que esta tarjeta/número le
+                    // pertenece a esta cuenta — así, si no existía todavía
+                    // el registro en mesaCuponera (alguien que se registra
+                    // por primera vez desde la app, sin haber pasado antes
+                    // por una tarjeta física), se crea aquí mismo, para que
+                    // ninguna otra cuenta pueda reclamar este número después.
+                    tx.set(cuponeraRef, { telefono, fusionadaConUid: user.uid }, { merge: true });
                 });
+
+                // Se limpia el formulario y se cambia a la vista normal de
+                // cuponera, para que la próxima vez que se abra no aparezca
+                // otra vez este formulario con los datos ya guardados.
+                loyaltyPhoneInput.value = '';
+                loyaltyPhoneNombreInput.value = '';
+                loyaltyPhoneFechaInput.value = '';
+                loyaltyPhoneAskView.hidden = true;
+                startLoyaltyTracking(user.uid);
 
                 loyaltyModalOverlay.classList.remove('active');
             } catch (err) {
-                console.error('Error guardando el teléfono:', err);
-                loyaltyPhoneError.textContent = 'No se pudo guardar. Intenta de nuevo.';
+                if (err && err.message === 'TELEFONO_DUPLICADO') {
+                    loyaltyPhoneError.textContent = 'Ese número ya está registrado en otra cuenta. Verifica que sea el tuyo o usa otro número.';
+                } else {
+                    console.error('Error guardando el teléfono:', err);
+                    loyaltyPhoneError.textContent = 'No se pudo guardar. Intenta de nuevo.';
+                }
                 loyaltyPhoneError.style.display = 'block';
+                loyaltyPhoneInput.focus();
             } finally {
                 loyaltyPhoneGuardarBtn.disabled = false;
                 loyaltyPhoneGuardarBtn.textContent = 'Guardar';
@@ -5453,7 +5489,17 @@
             });
         }
 
-        loyaltyFab.addEventListener('click', () => loyaltyModalOverlay.classList.add('active'));
+        loyaltyFab.addEventListener('click', () => {
+            // Cada vez que se abre el botón flotante se vuelve a revisar el
+            // estado real (en vez de solo mostrar la overlay tal cual quedó
+            // la última vez), para que un cliente logueado que ya guardó su
+            // teléfono siempre vea su progreso y no el formulario viejo.
+            const user = auth.currentUser;
+            if (user && !user.isAnonymous) {
+                revisarYPedirTelefono(user.uid, false);
+            }
+            loyaltyModalOverlay.classList.add('active');
+        });
         loyaltyModalClose.addEventListener('click', () => loyaltyModalOverlay.classList.remove('active'));
         loyaltyModalOverlay.addEventListener('click', (e) => {
             if (e.target === loyaltyModalOverlay) loyaltyModalOverlay.classList.remove('active');
