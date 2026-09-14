@@ -538,7 +538,7 @@
     <div class="qr-creacion-box" id="qrCreacionBox">
         <img id="qrCreacionImg" width="170" height="170" alt="Código QR de la nueva tarjeta">
         <div class="qr-creacion-texto" id="qrCreacionTexto"></div>
-        <div class="qr-creacion-nota">Tómale foto a esto o muéstraselo al cliente — es su tarjeta para la próxima visita.</div>
+        <div class="qr-creacion-nota" id="qrCreacionNota">Tómale foto a esto o muéstraselo al cliente — es su tarjeta para la próxima visita.</div>
     </div>
 </div>
 
@@ -1548,10 +1548,19 @@
                 if (datosExistente.fusionadaConUid) {
                     // Este número ya es la cuenta de un cliente que se
                     // registró desde la app — no es un choque real, es
-                    // la misma persona. En vez de bloquear, se completa
-                    // el nombre/fecha si el mesero los apuntó y faltaban,
-                    // y se muestra su QR (que ya existía) listo para
-                    // imprimir/mostrar.
+                    // la misma persona. En vez de bloquear ni crear nada
+                    // nuevo, solo se consulta: se completa el nombre/fecha
+                    // si el mesero los apuntó y faltaban, y se muestra el
+                    // QR que ya existía, dejando claro que no se creó
+                    // ninguna tarjeta nueva.
+                    //
+                    // A propósito NO se consulta aquí el correo de la
+                    // cuenta (clientes/{uid}): el mesero entra de forma
+                    // anónima y las reglas de Firestore no le permiten
+                    // leer ese documento — el correo sigue siendo privado,
+                    // solo lo ve el cliente y el admin. Si necesitas
+                    // verificar el correo de una cuenta, revísalo en el
+                    // panel de admin (ya aparece junto al QR fusionado).
                     const actualizaciones = {};
                     if (nombreOpcional && !datosExistente.nombre) actualizaciones.nombre = nombreOpcional;
                     if (fechaNacimiento && !datosExistente.fechaNacimiento) actualizaciones.fechaNacimiento = fechaNacimiento;
@@ -1567,7 +1576,10 @@
 
                     document.getElementById('qrCreacionImg').src =
                         'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(telefono);
-                    document.getElementById('qrCreacionTexto').textContent = (datosExistente.nombre || 'Tarjeta del ' + telefono);
+                    document.getElementById('qrCreacionTexto').textContent =
+                        '✅ Ya existía — ' + (datosExistente.nombre || 'Tarjeta del ' + telefono);
+                    document.getElementById('qrCreacionNota').textContent =
+                        'Este cliente ya tenía cuenta y tarjeta — no se creó ninguna nueva. Muéstrale este mismo QR.';
                     document.getElementById('qrCreacionBox').style.display = 'block';
 
                     input.value = '';
@@ -1605,6 +1617,8 @@
             document.getElementById('qrCreacionImg').src =
                 'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(telefono);
             document.getElementById('qrCreacionTexto').textContent = (nombreOpcional || 'Tarjeta del ' + telefono);
+            document.getElementById('qrCreacionNota').textContent =
+                'Tómale foto a esto o muéstraselo al cliente — es su tarjeta para la próxima visita.';
             document.getElementById('qrCreacionBox').style.display = 'block';
 
             input.value = '';
