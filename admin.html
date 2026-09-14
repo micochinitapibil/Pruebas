@@ -291,6 +291,12 @@
         background: #fff5f5; border: 2px solid var(--red); border-radius: 10px;
         padding: 12px; margin-bottom: 8px; border-bottom: 2px solid var(--red);
     }
+    .cupon-qr-thumb {
+        flex-shrink: 0; width: 52px; height: 52px; border-radius: 8px;
+        border: 1px solid #eee; background: #fff; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .cupon-qr-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .cupon-item .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
     .cupon-item .info .name { font-weight: 700; font-size: 14px; color: var(--dark); }
     .cupon-item .info .meta { font-size: 12.5px; color: var(--secondary); }
@@ -301,6 +307,19 @@
     .link-badge.sin { background: #f0e9d6; color: var(--secondary); }
     .dup-warning { font-size: 11.5px; font-weight: 700; color: var(--red); margin-top: 2px; }
     .cupon-empty { font-size: 13px; color: #999; padding: 6px 4px; }
+
+    /* Modal del QR ampliado */
+    #qrModal {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+        z-index: 150; align-items: center; justify-content: center; padding: 20px;
+    }
+    #qrModal .qr-modal-box {
+        background: #fff; border-radius: 14px; padding: 24px; text-align: center;
+        max-width: 280px; width: 100%;
+    }
+    #qrModal img { border-radius: 8px; }
+    #qrModal .qr-modal-label { margin-top: 12px; font-weight: 700; color: var(--dark); font-size: 14px; }
+    #qrModal .qr-modal-sub { font-size: 12px; color: #888; margin-top: 2px; }
 
     /* Modal editar/agregar */
     #productModal {
@@ -483,6 +502,16 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- ============ MODAL QR ampliado ============ -->
+<div id="qrModal">
+    <div class="qr-modal-box">
+        <img id="qrModalImg" width="220" height="220" alt="Código QR">
+        <div class="qr-modal-label" id="qrModalLabel"></div>
+        <div class="qr-modal-sub" id="qrModalSub"></div>
+        <button class="btn btn-outline" id="qrModalCloseBtn" style="width:100%; margin-top:16px;">Cerrar</button>
+    </div>
+</div>
 
 <script>
     // ==================================================
@@ -675,6 +704,9 @@
             const row = document.createElement('div');
             row.className = 'cupon-item' + ((esDupTel || esDupNombre) ? ' dup' : '');
             row.innerHTML = `
+                <div class="cupon-qr-thumb" title="Ver QR más grande">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(t.id)}" alt="QR" loading="lazy">
+                </div>
                 <div class="info">
                     <div class="name">${t.nombre || '(sin nombre)'} ${vinculada
                         ? '<span class="link-badge">🔗 cuenta vinculada</span>'
@@ -686,6 +718,8 @@
                 </div>
                 <button class="icon-btn del" title="Borrar tarjeta"><i class="fas fa-trash"></i></button>
             `;
+            row.querySelector('.cupon-qr-thumb').addEventListener('click', () =>
+                abrirQrModal(t.id, t.nombre, telefonoMostrado));
             row.querySelector('.icon-btn.del').addEventListener('click', () =>
                 confirmarBorrarTarjeta(t.id, t.nombre || telefonoMostrado || t.id));
             wrapT.appendChild(row);
@@ -705,6 +739,7 @@
             row.innerHTML = `
                 <div class="info">
                     <div class="name">${c.nombre || '(sin nombre)'} <span class="link-badge">🔗 cuenta de Google</span></div>
+                    <div class="meta">📧 ${c.email || 'sin correo guardado (se llena en su próximo inicio de sesión)'}</div>
                     <div class="meta">${c.telefono ? '📱 ' + c.telefono : 'Sin teléfono guardado'}</div>
                     <div class="meta">${c.ordersCompleted || 0} pedidos · ${c.freeDishesAvailable || 0} gratis disponible(s)</div>
                     <div class="meta" style="font-size:11px; opacity:.6;">UID: ${c.id}</div>
@@ -720,6 +755,21 @@
     }
 
     document.getElementById('searchCupon').addEventListener('input', renderCuponPanel);
+
+    // ---- Modal para ver el QR ampliado ----
+    function abrirQrModal(id, nombre, telefono) {
+        document.getElementById('qrModalImg').src =
+            'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(id);
+        document.getElementById('qrModalLabel').textContent = nombre || telefono || id;
+        document.getElementById('qrModalSub').textContent = telefono ? 'Tel: ' + telefono : 'Código: ' + id;
+        document.getElementById('qrModal').style.display = 'flex';
+    }
+    document.getElementById('qrModalCloseBtn').addEventListener('click', () => {
+        document.getElementById('qrModal').style.display = 'none';
+    });
+    document.getElementById('qrModal').addEventListener('click', (e) => {
+        if (e.target.id === 'qrModal') document.getElementById('qrModal').style.display = 'none';
+    });
 
     function confirmarBorrarTarjeta(id, etiqueta) {
         if (!confirm(`¿Borrar la tarjeta de "${etiqueta}"?\n\nSi alguien todavía tiene guardado este código QR en su celular, dejará de funcionar. Esto no se puede deshacer.`)) return;

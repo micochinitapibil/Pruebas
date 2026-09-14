@@ -3623,6 +3623,12 @@
                 updateUserUI(user);
                 startLoyaltyTracking(user.uid);
                 watchMyOrders(user.uid);
+                // Se guarda (o refresca) el correo de la cuenta en su ficha
+                // de cuponera cada vez que inicia sesión, para que en el
+                // panel de admin se pueda ver a quién pertenece cada
+                // cuenta sin depender de nada más.
+                db.collection('clientes').doc(user.uid).set({ email: user.email || null }, { merge: true })
+                    .catch(err => console.error('Error guardando el correo del cliente:', err));
             } else if (user && user.isAnonymous) {
                 // Invitado que ya había hecho un pedido digital antes: lo dejamos pasar directo
                 if (lastSessionKey !== undefined && lastSessionKey !== 'anon:' + user.uid) resetSessionState();
@@ -5294,6 +5300,7 @@
                     const gratisTarjeta = yaTeniaTarjetaQr ? (cuponeraDoc.data().freeDishesAvailable || 0) : 0;
                     const datosCliente = {
                         telefono,
+                        email: user.email || null,
                         ordersCompleted: ordersPrevios + ordersTarjeta,
                         freeDishesAvailable: gratisPrevios + gratisTarjeta
                     };
