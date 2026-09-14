@@ -407,17 +407,17 @@
         <div class="card">
             <h3>🎟️ Cuponera — tarjetas y cuentas</h3>
             <p style="font-size:12px; color:#888; margin-bottom:12px;">
-                Aquí aparecen todas las tarjetas de cuponera (código QR, con o sin cuenta vinculada) y las cuentas de clientes registrados desde la app. Las que están marcadas en rojo tienen el mismo número o el mismo nombre repetido en otra tarjeta o cuenta — revísalas antes de borrar.
+                Aquí aparecen todas las tarjetas de cuponera (código QR). Cuando una tarjeta ya está vinculada a una cuenta de Google, sus datos se muestran juntos en un solo renglón (QR, correo, teléfono, UID y progreso). Abajo solo quedan las cuentas de Google que todavía no tienen tarjeta vinculada. Las marcadas en rojo tienen el mismo número o el mismo nombre repetido — revísalas antes de borrar.
             </p>
-            <input type="text" id="searchCupon" placeholder="Buscar por nombre o teléfono...">
+            <input type="text" id="searchCupon" placeholder="Buscar por nombre, teléfono o correo...">
             <div id="cuponCountInfo" style="font-size:12px; color:#999; margin:8px 0;"></div>
 
             <div class="cupon-group">
-                <h4>Tarjetas QR (mesaCuponera)</h4>
+                <h4>Tarjetas QR (con o sin cuenta vinculada)</h4>
                 <div id="cuponeraListWrap"></div>
             </div>
             <div class="cupon-group">
-                <h4>Cuentas de clientes (Google)</h4>
+                <h4>Cuentas de Google sin tarjeta vinculada</h4>
                 <div id="clientesListWrap"></div>
             </div>
         </div>
@@ -701,25 +701,48 @@
         const dupNombresTarjetas = contarNombresRepetidos(allTarjetas);
         const dupNombresClientes = contarNombresRepetidos(allClientesCupon);
 
-        const tarjetasFiltradas = allTarjetas.filter(t =>
-            cuponCoincideBusqueda(search, t.nombre, t.telefono || t.id, t.id));
+        // Cuenta de Google indexada por uid, para poder fusionar cada
+        // tarjeta vinculada con su cuenta en un solo renglón.
+        const clientesPorUid = {};
+        allClientesCupon.forEach(c => { clientesPorUid[c.id] = c; });
+
+        const tarjetasFiltradas = allTarjetas.filter(t => {
+            const cliente = t.fusionadaConUid ? clientesPorUid[t.fusionadaConUid] : null;
+            return cuponCoincideBusqueda(search, t.nombre, t.telefono || t.id, t.id) ||
+                (cliente && (cuponCoincideBusqueda(search, cliente.nombre, cliente.telefono, cliente.id) ||
+                             (cliente.email || '').toLowerCase().includes(search)));
+        });
+
+        // Las cuentas de Google que ya aparecen fusionadas arriba (con
+        // tarjeta vinculada) no se repiten en esta segunda lista.
+        const uidsFusionados = new Set(
+            allTarjetas.filter(t => t.fusionadaConUid).map(t => t.fusionadaConUid));
         const clientesFiltrados = allClientesCupon.filter(c =>
-            cuponCoincideBusqueda(search, c.nombre, c.telefono, c.id));
+            !uidsFusionados.has(c.id) &&
+            (cuponCoincideBusqueda(search, c.nombre, c.telefono, c.id) ||
+             (c.email || '').toLowerCase().includes(search)));
 
         document.getElementById('cuponCountInfo').textContent =
-            `${tarjetasFiltradas.length} tarjeta(s) QR · ${clientesFiltrados.length} cuenta(s) de cliente`;
+            `${tarjetasFiltradas.length} tarjeta(s) QR · ${clientesFiltrados.length} cuenta(s) de Google sin tarjeta`;
 
-        // ---- Tarjetas QR (mesaCuponera) ----
+        // ---- Tarjetas QR (mesaCuponera), fusionadas con su cuenta de Google si tienen ----
         const wrapT = document.getElementById('cuponeraListWrap');
         wrapT.innerHTML = '';
         if (tarjetasFiltradas.length === 0) {
             wrapT.innerHTML = '<div class="cupon-empty">Sin resultados.</div>';
         }
         tarjetasFiltradas.forEach(t => {
-            const telefonoMostrado = t.telefono || (/^\d{10}$/.test(t.id) ? t.id : '');
+            const cliente = t.fusionadaConUid ? clientesPorUid[t.fusionadaConUid] : null;
+            const telefonoMostrado = t.telefono || (/^\d{10}$/.test(t.id) ? t.id : '') || cliente?.telefono || '';
             const esDupTel = telefonoMostrado && dupTelefonos[telefonoMostrado] > 1;
-            const esDupNombre = t.nombre && dupNombresTarjetas[t.nombre.trim().toLowerCase()] > 1;
+            const nombreMostrado = t.nombre || cliente?.nombre || '';
+            const esDupNombre = nombreMostrado && (dupNombresTarjetas[nombreMostrado.trim().toLowerCase()] > 1
+                || (cliente && dupNombresClientes[nombreMostrado.trim().toLowerCase()] > 1));
             const vinculada = !!t.fusionadaConUid;
+            // clientes/{uid} es la fuente de verdad del progreso; si no hay
+            // cuenta fusionada, se usa el número de la propia tarjeta.
+            const ordersCompleted = cliente ? (cliente.ordersCompleted || 0) : (t.ordersCompleted || 0);
+            const freeDishesAvailable = cliente ? (cliente.freeDishesAvailable || 0) : (t.freeDishesAvailable || 0);
             const row = document.createElement('div');
             row.className = 'cupon-item' + ((esDupTel || esDupNombre) ? ' dup' : '');
             row.innerHTML = `
@@ -727,24 +750,28 @@
                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(t.id)}" alt="QR" loading="lazy">
                 </div>
                 <div class="info">
-                    <div class="name">${t.nombre || '(sin nombre)'} ${vinculada
+                    <div class="name">${nombreMostrado || '(sin nombre)'} ${vinculada
                         ? '<span class="link-badge">🔗 cuenta vinculada</span>'
                         : '<span class="link-badge sin">sin cuenta</span>'}</div>
+                    ${cliente ? `<div class="meta">📧 ${cliente.email || 'sin correo guardado'}</div>` : ''}
                     <div class="meta">${telefonoMostrado ? '📱 ' + telefonoMostrado : 'Código: ' + t.id}</div>
-                    <div class="meta">${t.ordersCompleted || 0} pedidos · ${t.freeDishesAvailable || 0} gratis disponible(s)</div>
+                    <div class="meta">${ordersCompleted} pedidos · ${freeDishesAvailable} gratis disponible(s)</div>
+                    ${cliente ? `<div class="meta" style="font-size:11px; opacity:.6;">UID: ${cliente.id}</div>` : ''}
                     ${esDupTel ? '<div class="dup-warning">⚠ Número repetido en otra tarjeta o cuenta</div>' : ''}
-                    ${esDupNombre ? '<div class="dup-warning">⚠ Nombre repetido en otra tarjeta</div>' : ''}
+                    ${esDupNombre ? '<div class="dup-warning">⚠ Nombre repetido en otra tarjeta o cuenta</div>' : ''}
                 </div>
-                <button class="icon-btn del" title="Borrar tarjeta"><i class="fas fa-trash"></i></button>
+                <button class="icon-btn del" title="Borrar"><i class="fas fa-trash"></i></button>
             `;
             row.querySelector('.cupon-qr-thumb').addEventListener('click', () =>
-                abrirQrModal(t.id, t.nombre, telefonoMostrado));
-            row.querySelector('.icon-btn.del').addEventListener('click', () =>
-                confirmarBorrarTarjeta(t.id, t.nombre || telefonoMostrado || t.id));
+                abrirQrModal(t.id, nombreMostrado, telefonoMostrado));
+            row.querySelector('.icon-btn.del').addEventListener('click', () => {
+                if (cliente) confirmarBorrarVinculado(t.id, cliente.id, nombreMostrado || telefonoMostrado || t.id);
+                else confirmarBorrarTarjeta(t.id, nombreMostrado || telefonoMostrado || t.id);
+            });
             wrapT.appendChild(row);
         });
 
-        // ---- Cuentas de clientes (Google) ----
+        // ---- Cuentas de Google que todavía no tienen tarjeta vinculada ----
         const wrapC = document.getElementById('clientesListWrap');
         wrapC.innerHTML = '';
         if (clientesFiltrados.length === 0) {
@@ -794,6 +821,16 @@
         if (!confirm(`¿Borrar la tarjeta de "${etiqueta}"?\n\nSi alguien todavía tiene guardado este código QR en su celular, dejará de funcionar. Esto no se puede deshacer.`)) return;
         cuponeraRef.doc(id).delete()
             .then(() => showToast('Tarjeta eliminada'))
+            .catch(err => showToast('Error: ' + err.message));
+    }
+
+    function confirmarBorrarVinculado(tarjetaId, clienteUid, etiqueta) {
+        if (!confirm(`¿Borrar la cuponera de "${etiqueta}"?\n\nEsto borra la tarjeta QR, su progreso de pedidos, su platillo gratis (si tenía) y su teléfono guardado — no borra su cuenta de Google, así que puede volver a registrar su teléfono después. Esto no se puede deshacer.`)) return;
+        const batch = db.batch();
+        batch.delete(cuponeraRef.doc(tarjetaId));
+        batch.delete(clientesRef.doc(clienteUid));
+        batch.commit()
+            .then(() => showToast('Cuponera eliminada'))
             .catch(err => showToast('Error: ' + err.message));
     }
 
