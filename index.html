@@ -2309,6 +2309,31 @@
             box-sizing: border-box;
         }
         #loyaltyQrPasoNombre input:focus { outline: none; border-color: var(--secondary); }
+        #loyaltyPhoneAskView input {
+            width: 100%;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-family: inherit;
+            font-size: 15px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+        #loyaltyPhoneAskView input:focus { outline: none; border-color: var(--secondary); }
+        .loyalty-phone-error {
+            display: none;
+            color: #c0392b;
+            font-size: 12.5px;
+            font-weight: 600;
+            margin: -6px 0 10px;
+            text-align: left;
+        }
+        .loyalty-phone-hint {
+            font-size: 12px;
+            color: #a08a5f;
+            margin: -6px 0 14px;
+            text-align: left;
+        }
         .loyalty-qr-box {
             background: white;
             border-radius: 16px;
@@ -3360,6 +3385,21 @@
                 </button>
             </div>
 
+            <!-- Vista para completar el perfil justo después de loguearse con
+                 Google la primera vez: el teléfono es obligatorio (es lo que
+                 permite fusionar esta cuenta con una tarjeta QR ya existente
+                 con el mismo número); nombre y fecha de nacimiento son
+                 opcionales, igual que en el código QR sin cuenta. -->
+            <div id="loyaltyPhoneAskView" hidden>
+                <p>Para terminar, dinos tu número de celular — con él identificamos si ya tenías una tarjeta de puntos (por QR) para juntar tu progreso en una sola cuenta.</p>
+                <input type="tel" id="loyaltyPhoneInput" placeholder="Número de celular (10 dígitos)" maxlength="10" inputmode="numeric" autocomplete="off">
+                <div class="loyalty-phone-error" id="loyaltyPhoneError"></div>
+                <input type="text" id="loyaltyPhoneNombreInput" placeholder="Nombre (opcional)" maxlength="40" autocomplete="off">
+                <input type="date" id="loyaltyPhoneFechaInput">
+                <div class="loyalty-phone-hint">Nombre y fecha de nacimiento son opcionales</div>
+                <button type="button" class="google-btn" id="loyaltyPhoneGuardarBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Guardar</button>
+            </div>
+
             <!-- Vista para invitados que prefieren un código QR en vez de cuenta -->
             <div id="loyaltyGuestQrView" hidden>
                 <button type="button" class="loyalty-qr-back" id="loyaltyQrBackBtn"><i class="fas fa-arrow-left"></i> Volver</button>
@@ -3505,13 +3545,32 @@
             authError.style.display = 'none';
             googleSignInBtn.disabled = true;
             auth.signInWithPopup(googleProvider)
-                .then(() => { loyaltyModalOverlay.classList.remove('active'); })
+                .then(result => revisarYPedirTelefono(result.user.uid))
                 .catch(err => {
                     const message = friendlyAuthError(err);
                     if (message) showAuthError(message);
                 })
                 .finally(() => { googleSignInBtn.disabled = false; });
         });
+
+        // Justo después de loguearse con Google, se revisa si a esta cuenta
+        // todavía le falta el teléfono. Si ya lo tiene guardado, se cierra
+        // el modal como antes; si no, se muestra el formulario para
+        // pedirlo (obligatorio) junto con nombre y fecha de nacimiento
+        // (opcionales) antes de cerrar el modal.
+        async function revisarYPedirTelefono(uid) {
+            try {
+                const doc = await db.collection('clientes').doc(uid).get();
+                if (doc.exists && doc.data().telefono) {
+                    loyaltyModalOverlay.classList.remove('active');
+                } else {
+                    mostrarLoyaltyPhoneAskView();
+                }
+            } catch (err) {
+                console.error('Error revisando el teléfono guardado:', err);
+                loyaltyModalOverlay.classList.remove('active');
+            }
+        }
 
         function updateUserUI(user) {
             if (user && !user.isAnonymous) {
@@ -5155,6 +5214,91 @@
                 }
             }, err => console.error('Error leyendo cuponera:', err));
         }
+
+        // ============================================
+        // TELÉFONO OBLIGATORIO AL LOGUEARSE CON GOOGLE
+        // (nombre y fecha de nacimiento opcionales) + FUSIÓN con una
+        // tarjeta de QR (mesaCuponera) que ya tenga ese mismo número.
+        // ============================================
+        const loyaltyPhoneAskView = document.getElementById('loyaltyPhoneAskView');
+        const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
+        const loyaltyPhoneError = document.getElementById('loyaltyPhoneError');
+        const loyaltyPhoneNombreInput = document.getElementById('loyaltyPhoneNombreInput');
+        const loyaltyPhoneFechaInput = document.getElementById('loyaltyPhoneFechaInput');
+        const loyaltyPhoneGuardarBtn = document.getElementById('loyaltyPhoneGuardarBtn');
+
+        function mostrarLoyaltyPhoneAskView() {
+            loyaltyGuestView.hidden = true;
+            loyaltyGuestQrView.hidden = true;
+            loyaltyUserView.hidden = true;
+            loyaltyPhoneError.style.display = 'none';
+            loyaltyPhoneAskView.hidden = false;
+        }
+
+        loyaltyPhoneInput.addEventListener('input', () => {
+            loyaltyPhoneInput.value = loyaltyPhoneInput.value.replace(/\D/g, '').slice(0, 10);
+            loyaltyPhoneError.style.display = 'none';
+        });
+
+        loyaltyPhoneGuardarBtn.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const telefono = loyaltyPhoneInput.value.replace(/\D/g, '');
+            if (telefono.length !== 10) {
+                loyaltyPhoneError.textContent = 'El número debe tener exactamente 10 dígitos.';
+                loyaltyPhoneError.style.display = 'block';
+                loyaltyPhoneInput.focus();
+                return;
+            }
+            const nombre = loyaltyPhoneNombreInput.value.trim();
+            const fechaNacimiento = loyaltyPhoneFechaInput.value;
+
+            loyaltyPhoneGuardarBtn.disabled = true;
+            loyaltyPhoneGuardarBtn.textContent = 'Guardando…';
+            try {
+                const clienteRef = db.collection('clientes').doc(user.uid);
+                const cuponeraRef = db.collection('mesaCuponera').doc(telefono);
+
+                await db.runTransaction(async tx => {
+                    const [clienteDoc, cuponeraDoc] = await Promise.all([tx.get(clienteRef), tx.get(cuponeraRef)]);
+
+                    // Si ya existe una tarjeta de QR con este mismo número,
+                    // se suma su progreso (visitas y platillos gratis) al
+                    // que la cuenta ya traiga — así se reconoce que es la
+                    // misma persona y no se pierde nada de ningún lado.
+                    const yaTeniaTarjetaQr = cuponeraDoc.exists;
+                    const ordersPrevios = clienteDoc.exists ? (clienteDoc.data().ordersCompleted || 0) : 0;
+                    const gratisPrevios = clienteDoc.exists ? (clienteDoc.data().freeDishesAvailable || 0) : 0;
+                    const ordersTarjeta = yaTeniaTarjetaQr ? (cuponeraDoc.data().ordersCompleted || 0) : 0;
+                    const gratisTarjeta = yaTeniaTarjetaQr ? (cuponeraDoc.data().freeDishesAvailable || 0) : 0;
+                    const datosCliente = {
+                        telefono,
+                        ordersCompleted: ordersPrevios + ordersTarjeta,
+                        freeDishesAvailable: gratisPrevios + gratisTarjeta
+                    };
+                    if (nombre) datosCliente.nombre = nombre;
+                    if (fechaNacimiento) datosCliente.fechaNacimiento = fechaNacimiento;
+
+                    tx.set(clienteRef, datosCliente, { merge: true });
+
+                    // Se marca la tarjeta de QR como fusionada con esta
+                    // cuenta (no se borra: sigue sirviendo si el mesero la
+                    // escanea), para que no la pueda "reclamar" otra cuenta.
+                    if (yaTeniaTarjetaQr && !cuponeraDoc.data().fusionadaConUid) {
+                        tx.update(cuponeraRef, { fusionadaConUid: user.uid });
+                    }
+                });
+
+                loyaltyModalOverlay.classList.remove('active');
+            } catch (err) {
+                console.error('Error guardando el teléfono:', err);
+                loyaltyPhoneError.textContent = 'No se pudo guardar. Intenta de nuevo.';
+                loyaltyPhoneError.style.display = 'block';
+            } finally {
+                loyaltyPhoneGuardarBtn.disabled = false;
+                loyaltyPhoneGuardarBtn.textContent = 'Guardar';
+            }
+        });
 
         // ============================================
         // CUPONERA SIN CUENTA (código QR) — misma colección "mesaCuponera"
