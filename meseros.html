@@ -1561,14 +1561,14 @@
                     // solo lo ve el cliente y el admin. Si necesitas
                     // verificar el correo de una cuenta, revísalo en el
                     // panel de admin (ya aparece junto al QR fusionado).
-                    const actualizaciones = {};
-                    if (nombreOpcional && !datosExistente.nombre) actualizaciones.nombre = nombreOpcional;
-                    if (fechaNacimiento && !datosExistente.fechaNacimiento) actualizaciones.fechaNacimiento = fechaNacimiento;
-                    if (Object.keys(actualizaciones).length) {
-                        await ref.update(actualizaciones);
-                        Object.assign(datosExistente, actualizaciones);
-                        sincronizarCacheCupon(telefono, actualizaciones);
-                    }
+                    //
+                    // Este número ya tiene cuenta y QR vinculados: la
+                    // ficha es de solo lectura desde aquí. Aunque el
+                    // mesero haya escrito nombre/fecha de nacimiento en
+                    // el formulario, NO se guardan — esos datos ya los
+                    // controla el cliente desde su cuenta (index.html), y
+                    // no se permite que una tarjeta "nueva" los sobrescriba
+                    // por accidente ni los complete a la fuerza.
 
                     pausarScannerCupon();
                     document.getElementById('errorCupon').style.display = 'none';
