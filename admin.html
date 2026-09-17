@@ -695,6 +695,18 @@
                (id || '').toLowerCase().includes(search);
     }
 
+    // La fecha de nacimiento se guarda como "YYYY-MM-DD" (input type=date).
+    // Se parte a mano en vez de usar new Date(), porque esa cadena se
+    // interpreta como UTC y en México terminaría mostrando el día anterior.
+    const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    function formatearFechaNac(valor) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((valor || '').trim());
+        if (!m) return valor;
+        const [, anio, mes, dia] = m;
+        const nombreMes = MESES_CORTOS[parseInt(mes, 10) - 1] || mes;
+        return `${parseInt(dia, 10)} ${nombreMes} ${anio}`;
+    }
+
     function renderCuponPanel() {
         const search = document.getElementById('searchCupon').value.trim().toLowerCase();
         const dupTelefonos = contarTelefonosRepetidos();
@@ -736,6 +748,7 @@
             const telefonoMostrado = t.telefono || (/^\d{10}$/.test(t.id) ? t.id : '') || cliente?.telefono || '';
             const esDupTel = telefonoMostrado && dupTelefonos[telefonoMostrado] > 1;
             const nombreMostrado = t.nombre || cliente?.nombre || '';
+            const fechaNacMostrada = t.fechaNacimiento || cliente?.fechaNacimiento || '';
             const esDupNombre = nombreMostrado && (dupNombresTarjetas[nombreMostrado.trim().toLowerCase()] > 1
                 || (cliente && dupNombresClientes[nombreMostrado.trim().toLowerCase()] > 1));
             const vinculada = !!t.fusionadaConUid;
@@ -755,6 +768,7 @@
                         : '<span class="link-badge sin">sin cuenta</span>'}</div>
                     ${cliente ? `<div class="meta">📧 ${cliente.email || 'sin correo guardado'}</div>` : ''}
                     <div class="meta">${telefonoMostrado ? '📱 ' + telefonoMostrado : 'Código: ' + t.id}</div>
+                    ${fechaNacMostrada ? `<div class="meta">🎂 ${formatearFechaNac(fechaNacMostrada)}</div>` : ''}
                     <div class="meta">${ordersCompleted} pedidos · ${freeDishesAvailable} gratis disponible(s)</div>
                     ${cliente ? `<div class="meta" style="font-size:11px; opacity:.6;">UID: ${cliente.id}</div>` : ''}
                     ${esDupTel ? '<div class="dup-warning">⚠ Número repetido en otra tarjeta o cuenta</div>' : ''}
@@ -787,6 +801,7 @@
                     <div class="name">${c.nombre || '(sin nombre)'} <span class="link-badge">🔗 cuenta de Google</span></div>
                     <div class="meta">📧 ${c.email || 'sin correo guardado (se llena en su próximo inicio de sesión)'}</div>
                     <div class="meta">${c.telefono ? '📱 ' + c.telefono : 'Sin teléfono guardado'}</div>
+                    ${c.fechaNacimiento ? `<div class="meta">🎂 ${formatearFechaNac(c.fechaNacimiento)}</div>` : ''}
                     <div class="meta">${c.ordersCompleted || 0} pedidos · ${c.freeDishesAvailable || 0} gratis disponible(s)</div>
                     <div class="meta" style="font-size:11px; opacity:.6;">UID: ${c.id}</div>
                     ${esDupTel ? '<div class="dup-warning">⚠ Número repetido en otra tarjeta o cuenta</div>' : ''}

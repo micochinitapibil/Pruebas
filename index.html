@@ -3457,14 +3457,14 @@
         </div>
     </div>
 
-    <!-- MODAL: NOMBRE REPETIDO EN LA CUPONERA (código QR sin cuenta) -->
+    <!-- MODAL: NÚMERO QUE YA TIENE UN QR ASOCIADO (código QR sin cuenta) -->
     <div class="addons-overlay" id="dupNombreOverlay" style="z-index:5200;">
         <div class="addons-modal" style="text-align:center;">
             <div style="font-size:42px; margin-bottom:6px;">⚠️</div>
-            <h3>Ese nombre ya está registrado</h3>
+            <h3>Este número ya tiene un QR</h3>
             <p class="addons-subtitle" id="dupNombreTexto"></p>
             <div class="addons-actions">
-                <button class="addons-continue-btn" id="dupBtnCancelar" style="width:100%;">Entendido, pongo otro nombre</button>
+                <button class="addons-continue-btn" id="dupBtnCancelar" style="width:100%;">Entendido</button>
             </div>
         </div>
     </div>
@@ -3584,7 +3584,29 @@
         async function revisarYPedirTelefono(uid, cerrarModalSiYaTiene = true) {
             try {
                 const doc = await db.collection('clientes').doc(uid).get();
-                if (doc.exists && doc.data().telefono) {
+                let telefonoGuardado = doc.exists ? doc.data().telefono : null;
+
+                // Si clientes/{uid} todavía no trae el teléfono, puede que
+                // esta cuenta YA tenga su tarjeta/QR en mesaCuponera (quedó
+                // vinculada con fusionadaConUid en un registro anterior).
+                // Antes se le volvía a pedir todo como si fuera nuevo, y al
+                // guardar fallaba porque el teléfono ya estaba ocupado por
+                // su propia tarjeta. Aquí se recupera ese número y se
+                // vuelve a dejar en su documento de cliente.
+                if (!telefonoGuardado) {
+                    const vinculadas = await db.collection('mesaCuponera')
+                        .where('fusionadaConUid', '==', uid).limit(1).get();
+                    if (!vinculadas.empty) {
+                        const tarjeta = vinculadas.docs[0];
+                        telefonoGuardado = tarjeta.data().telefono || tarjeta.id;
+                        await db.collection('clientes').doc(uid).set({
+                            telefono: telefonoGuardado,
+                            email: (auth.currentUser && auth.currentUser.email) || null
+                        }, { merge: true });
+                    }
+                }
+
+                if (telefonoGuardado) {
                     if (cerrarModalSiYaTiene) {
                         loyaltyModalOverlay.classList.remove('active');
                     } else {
@@ -5330,10 +5352,16 @@
                     // se suma su progreso (visitas y platillos gratis) al
                     // que la cuenta ya traiga — así se reconoce que es la
                     // misma persona y no se pierde nada de ningún lado.
+                    //
+                    // Pero si la tarjeta YA estaba fusionada con esta misma
+                    // cuenta, su progreso ya se sumó en su momento: volver a
+                    // sumarlo duplicaría los pedidos y los platillos gratis.
+                    // En ese caso solo se actualizan los datos.
+                    const yaEstabaFusionadaConmigo = dueñoActual === user.uid;
                     const ordersPrevios = clienteDoc.exists ? (clienteDoc.data().ordersCompleted || 0) : 0;
                     const gratisPrevios = clienteDoc.exists ? (clienteDoc.data().freeDishesAvailable || 0) : 0;
-                    const ordersTarjeta = yaTeniaTarjetaQr ? (cuponeraDoc.data().ordersCompleted || 0) : 0;
-                    const gratisTarjeta = yaTeniaTarjetaQr ? (cuponeraDoc.data().freeDishesAvailable || 0) : 0;
+                    const ordersTarjeta = (yaTeniaTarjetaQr && !yaEstabaFusionadaConmigo) ? (cuponeraDoc.data().ordersCompleted || 0) : 0;
+                    const gratisTarjeta = (yaTeniaTarjetaQr && !yaEstabaFusionadaConmigo) ? (cuponeraDoc.data().freeDishesAvailable || 0) : 0;
                     const datosCliente = {
                         telefono,
                         email: user.email || null,
@@ -5501,20 +5529,14 @@
                 const ref = db.collection('mesaCuponera').doc(telefono);
                 const existente = await ref.get();
                 if (existente.exists) {
-                    const datosExistente = existente.data();
-                    // Si ya está fusionada con una cuenta de Google, es de
-                    // solo lectura desde aquí: se muestra tal cual, sin
-                    // tocar sus datos (misma regla que meseros.html).
-                    if (!datosExistente.fusionadaConUid) {
-                        const actualizaciones = {};
-                        if (nombre && !datosExistente.nombre) actualizaciones.nombre = nombre;
-                        if (fechaNacimiento && !datosExistente.fechaNacimiento) actualizaciones.fechaNacimiento = fechaNacimiento;
-                        if (Object.keys(actualizaciones).length) {
-                            await ref.update(actualizaciones);
-                        }
-                    }
-                    localStorage.setItem(LOYALTY_QR_LS_KEY, telefono);
-                    loyaltyQrEscucharTarjeta(telefono);
+                    // Este número ya tiene un QR asociado. Por seguridad NO
+                    // se muestra aquí ni se actualiza ningún dato: cualquiera
+                    // podría teclear un número ajeno y quedarse con su QR (y
+                    // con sus platillos gratis). La recuperación la hace el
+                    // mesero desde meseros.html, que es quien tiene el
+                    // control y puede verificar en persona de quién es.
+                    await avisarTelefonoYaTieneQr(telefono);
+                    inputTelefono.focus();
                     return;
                 }
 
@@ -5548,14 +5570,17 @@
         });
 
         // Modal elegante (en vez del alert()/confirm() del navegador) para
-        // avisar cuando el nombre ya existe. Es un bloqueo real: no se deja
-        // crear el código hasta que cambien el nombre (para que nunca haya
-        // dos tarjetas con el mismo nombre exacto).
+        // avisar cuando el número ya tiene un QR. Es un bloqueo real y a
+        // propósito NO se muestra el QR ni los datos de esa tarjeta: si se
+        // mostraran, cualquiera podría teclear un número ajeno y quedarse
+        // con el QR de otra persona (y con sus platillos gratis). Quien
+        // recupera una tarjeta es el mesero desde meseros.html, que puede
+        // verificar en persona de quién es.
         const dupNombreOverlay = document.getElementById('dupNombreOverlay');
         const dupNombreTexto = document.getElementById('dupNombreTexto');
         const dupBtnCancelar = document.getElementById('dupBtnCancelar');
-        function avisarNombreDuplicado(nombre) {
-            dupNombreTexto.innerHTML = `Ya hay alguien registrado como <strong>"${nombre}"</strong>. Si ya tienes un código de una visita anterior, mejor pídele al mesero que te ayude a recuperarlo. Si eres una persona distinta, agrega un apellido o apodo (ej. "${nombre} P.") para diferenciarte.`;
+        function avisarTelefonoYaTieneQr(telefono) {
+            dupNombreTexto.innerHTML = `El número <strong>${telefono}</strong> ya está asociado a un código QR. Por seguridad no lo mostramos aquí.<br><br>Si es tu número, pídele al mesero que te ayude a recuperar tu código en el restaurante. Si te equivocaste al escribirlo, revísalo e intenta de nuevo.`;
             dupNombreOverlay.classList.add('active');
             return new Promise(resolve => {
                 function onCerrar() {
