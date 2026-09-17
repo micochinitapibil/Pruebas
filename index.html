@@ -3383,6 +3383,19 @@
                 <button type="button" class="loyalty-qr-toggle-btn" id="loyaltyQrToggleBtn">
                     <i class="fas fa-qrcode"></i> Participar sin cuenta — genera tu código
                 </button>
+
+                <!-- Recuperar un QR ya existente. A propósito NO hay
+                     sugerencias, autocompletado ni búsqueda parcial: solo
+                     se muestra la tarjeta si se teclea el número completo
+                     y exacto, para que nadie pueda ir tanteando números. -->
+                <button type="button" class="loyalty-qr-toggle-btn" id="buscarMiQrToggleBtn" style="margin-top:10px;">
+                    <i class="fas fa-search"></i> Ya tengo QR — buscarlo
+                </button>
+                <div id="buscarMiQrForm" hidden style="margin-top:12px;">
+                    <input type="tel" id="buscarMiQrInput" placeholder="Escribe tu número completo (10 dígitos)" maxlength="10" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" name="buscar-qr-sin-sugerencias">
+                    <div class="loyalty-phone-error" id="buscarMiQrError" style="display:none;"></div>
+                    <button type="button" class="google-btn" id="buscarMiQrBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Ver mi QR</button>
+                </div>
             </div>
 
             <!-- Vista para completar el perfil justo después de loguearse con
@@ -5569,6 +5582,61 @@
             loyaltyQrMostrarPasoNombre();
         });
 
+        // ---- Recuperar un QR ya existente ----
+        // Se consulta EXACTAMENTE el documento mesaCuponera/{telefono}: no
+        // hay listado, ni búsqueda parcial, ni sugerencias. O se teclea el
+        // número completo y correcto, o no se muestra nada.
+        const buscarMiQrToggleBtn = document.getElementById('buscarMiQrToggleBtn');
+        const buscarMiQrForm = document.getElementById('buscarMiQrForm');
+        const buscarMiQrInput = document.getElementById('buscarMiQrInput');
+        const buscarMiQrError = document.getElementById('buscarMiQrError');
+        const buscarMiQrBtn = document.getElementById('buscarMiQrBtn');
+
+        buscarMiQrToggleBtn.addEventListener('click', () => {
+            buscarMiQrForm.hidden = !buscarMiQrForm.hidden;
+            if (!buscarMiQrForm.hidden) buscarMiQrInput.focus();
+        });
+
+        buscarMiQrInput.addEventListener('input', () => {
+            buscarMiQrInput.value = buscarMiQrInput.value.replace(/\D/g, '').slice(0, 10);
+            buscarMiQrError.style.display = 'none';
+        });
+
+        buscarMiQrBtn.addEventListener('click', async () => {
+            const telefono = buscarMiQrInput.value.replace(/\D/g, '');
+            buscarMiQrError.style.display = 'none';
+            if (telefono.length !== 10) {
+                buscarMiQrError.textContent = 'Escribe tu número completo (10 dígitos).';
+                buscarMiQrError.style.display = 'block';
+                buscarMiQrInput.focus();
+                return;
+            }
+
+            buscarMiQrBtn.disabled = true;
+            buscarMiQrBtn.textContent = 'Buscando…';
+            try {
+                const doc = await db.collection('mesaCuponera').doc(telefono).get();
+                if (!doc.exists) {
+                    buscarMiQrError.textContent = 'No encontramos ningún QR con ese número. Revísalo o crea uno nuevo.';
+                    buscarMiQrError.style.display = 'block';
+                    buscarMiQrInput.focus();
+                    return;
+                }
+                buscarMiQrInput.value = '';
+                buscarMiQrForm.hidden = true;
+                localStorage.setItem(LOYALTY_QR_LS_KEY, telefono);
+                mostrarLoyaltyQrView();
+                loyaltyQrEscucharTarjeta(telefono);
+            } catch (err) {
+                console.error('Error buscando el QR:', err);
+                buscarMiQrError.textContent = 'No se pudo buscar. Intenta de nuevo.';
+                buscarMiQrError.style.display = 'block';
+            } finally {
+                buscarMiQrBtn.disabled = false;
+                buscarMiQrBtn.textContent = 'Ver mi QR';
+            }
+        });
+
         // Modal elegante (en vez del alert()/confirm() del navegador) para
         // avisar cuando el número ya tiene un QR. Es un bloqueo real y a
         // propósito NO se muestra el QR ni los datos de esa tarjeta: si se
@@ -5580,7 +5648,7 @@
         const dupNombreTexto = document.getElementById('dupNombreTexto');
         const dupBtnCancelar = document.getElementById('dupBtnCancelar');
         function avisarTelefonoYaTieneQr(telefono) {
-            dupNombreTexto.innerHTML = `El número <strong>${telefono}</strong> ya está asociado a un código QR. Por seguridad no lo mostramos aquí.<br><br>Si es tu número, pídele al mesero que te ayude a recuperar tu código en el restaurante. Si te equivocaste al escribirlo, revísalo e intenta de nuevo.`;
+            dupNombreTexto.innerHTML = `El número <strong>${telefono}</strong> ya está asociado a un código QR.<br><br>Si es tu número, usa la opción <strong>"Ya tengo QR — buscarlo"</strong> para recuperarlo. Si te equivocaste al escribirlo, revísalo e intenta de nuevo.`;
             dupNombreOverlay.classList.add('active');
             return new Promise(resolve => {
                 function onCerrar() {
