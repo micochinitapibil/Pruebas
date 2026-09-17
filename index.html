@@ -3404,10 +3404,17 @@
             <div id="loyaltyGuestQrView" hidden>
                 <button type="button" class="loyalty-qr-back" id="loyaltyQrBackBtn"><i class="fas fa-arrow-left"></i> Volver</button>
 
-                <!-- Paso 1: pedir nombre -->
+                <!-- Paso 1: pedir teléfono (obligatorio, es la clave para
+                     poder fusionar esta tarjeta con una cuenta de Google
+                     si algún día la crean), nombre y fecha de nacimiento
+                     (opcionales) — mismo modelo que usa meseros.html. -->
                 <div id="loyaltyQrPasoNombre">
-                    <p>Solo pedimos tu nombre de pila — sin correo ni contraseña. Guarda este código: muéstraselo al mesero cuando quieras registrar tu visita o canjear tu platillo gratis.</p>
-                    <input type="text" id="loyaltyQrInputNombre" placeholder="¿Cómo te llamas?" maxlength="30">
+                    <p>Necesitamos tu número de celular: es lo que permite unir esta tarjeta con tu cuenta si algún día inicias sesión con Google. Nombre y fecha de nacimiento son opcionales.</p>
+                    <input type="tel" id="loyaltyQrInputTelefono" placeholder="Número de celular (10 dígitos)" maxlength="10" inputmode="numeric" autocomplete="off">
+                    <div class="loyalty-phone-error" id="loyaltyQrTelefonoError" style="display:none;"></div>
+                    <input type="text" id="loyaltyQrInputNombre" placeholder="Nombre (opcional)" maxlength="30">
+                    <input type="date" id="loyaltyQrInputFecha">
+                    <div class="loyalty-phone-hint">Nombre y fecha de nacimiento son opcionales</div>
                     <button type="button" class="google-btn" id="loyaltyQrCrearBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Crear mi código</button>
                 </div>
 
@@ -3435,6 +3442,16 @@
                 <div class="loyalty-progress-text" id="loyaltyProgressText">0 de 7 pedidos</div>
                 <div class="loyalty-free-banner" id="loyaltyFreeBanner" hidden>
                     🎉 ¡Tienes <span id="loyaltyFreeCount">0</span> platillo(s) gratis! Menciónalo al hacer tu próximo pedido.
+                </div>
+
+                <!-- El QR es el mismo teléfono que ya guardó al loguearse
+                     (mesaCuponera/{telefono}) — aquí solo se muestra, no se
+                     crea nada nuevo. -->
+                <div class="loyalty-divider"><span>o</span></div>
+                <button type="button" class="loyalty-qr-toggle-btn" id="verMiQrBtn"><i class="fas fa-qrcode"></i> Ver mi QR</button>
+                <div id="miQrBox" hidden style="text-align:center; margin-top:14px;">
+                    <div class="loyalty-qr-box"><img id="miQrImg" width="170" height="170" alt="Tu código QR"></div>
+                    <div class="loyalty-qr-nota">Muéstrale este código al mesero para registrar tu visita o canjear tu platillo gratis.</div>
                 </div>
             </div>
         </div>
@@ -5165,6 +5182,7 @@
         const loyaltyFreeCount = document.getElementById('loyaltyFreeCount');
 
         let clienteUnsub = null;
+        let miTelefonoActual = null;
 
         // Se llama cada vez que la sesión cambia de verdad (cerró sesión, o entró
         // con una cuenta distinta a la anterior) para que el pedido de un cliente
@@ -5190,7 +5208,9 @@
         function showLoyaltyGuestView() {
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
             myFreeDishesAvailable = 0;
+            miTelefonoActual = null;
             loyaltyUserView.hidden = true;
+            document.getElementById('miQrBox').hidden = true;
             loyaltyFabBadge.hidden = true;
 
             // Si ya tiene un código QR guardado en este navegador, se le
@@ -5211,6 +5231,7 @@
             loyaltyUserView.hidden = false;
             clienteUnsub = db.collection('clientes').doc(uid).onSnapshot(doc => {
                 const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
+                miTelefonoActual = data.telefono || null;
                 const completed = data.ordersCompleted || 0;
                 const free = data.freeDishesAvailable || 0;
                 myFreeDishesAvailable = free;
@@ -5231,6 +5252,21 @@
                 }
             }, err => console.error('Error leyendo cuponera:', err));
         }
+
+        document.getElementById('verMiQrBtn').addEventListener('click', () => {
+            const miQrBox = document.getElementById('miQrBox');
+            const verMiQrBtn = document.getElementById('verMiQrBtn');
+            if (!miQrBox.hidden) {
+                miQrBox.hidden = true;
+                verMiQrBtn.innerHTML = '<i class="fas fa-qrcode"></i> Ver mi QR';
+                return;
+            }
+            if (!miTelefonoActual) return;
+            document.getElementById('miQrImg').src =
+                'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(miTelefonoActual);
+            miQrBox.hidden = false;
+            verMiQrBtn.innerHTML = '<i class="fas fa-qrcode"></i> Ocultar QR';
+        });
 
         // ============================================
         // TELÉFONO OBLIGATORIO AL LOGUEARSE CON GOOGLE
@@ -5371,16 +5407,7 @@
         const loyaltyQrReiniciarBtn = document.getElementById('loyaltyQrReiniciarBtn');
 
         const LOYALTY_QR_LS_KEY = 'mesaQrTarjetaId';
-        const LOYALTY_QR_ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
         let loyaltyQrUnsub = null;
-
-        function generarIdLoyaltyQr(largo = 7) {
-            let id = '';
-            for (let i = 0; i < largo; i++) {
-                id += LOYALTY_QR_ALFABETO[Math.floor(Math.random() * LOYALTY_QR_ALFABETO.length)];
-            }
-            return id;
-        }
 
         function mostrarLoyaltyQrView() {
             loyaltyGuestView.hidden = true;
@@ -5396,8 +5423,8 @@
         function loyaltyQrPintarTarjeta(id, data) {
             document.getElementById('loyaltyQrImg').src =
                 'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' + encodeURIComponent(id);
-            document.getElementById('loyaltyQrNombreTxt').textContent = data.nombre;
-            document.getElementById('loyaltyQrIdTxt').textContent = 'Código: ' + id;
+            document.getElementById('loyaltyQrNombreTxt').textContent = data.nombre || ('Tarjeta del ' + id);
+            document.getElementById('loyaltyQrIdTxt').textContent = 'Número: ' + id;
 
             const completed = data.ordersCompleted || 0;
             const free = data.freeDishesAvailable || 0;
@@ -5441,6 +5468,11 @@
             }
         });
 
+        document.getElementById('loyaltyQrInputTelefono').addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            document.getElementById('loyaltyQrTelefonoError').style.display = 'none';
+        });
+
         loyaltyQrBackBtn.addEventListener('click', () => {
             if (loyaltyQrUnsub) { loyaltyQrUnsub(); loyaltyQrUnsub = null; }
             loyaltyGuestQrView.hidden = true;
@@ -5448,31 +5480,56 @@
         });
 
         loyaltyQrCrearBtn.addEventListener('click', async () => {
+            const inputTelefono = document.getElementById('loyaltyQrInputTelefono');
+            const errorTxt = document.getElementById('loyaltyQrTelefonoError');
+            const inputFecha = document.getElementById('loyaltyQrInputFecha');
+            const telefono = inputTelefono.value.replace(/\D/g, '');
             const nombre = loyaltyQrInputNombre.value.trim();
-            if (!nombre) { loyaltyQrInputNombre.focus(); return; }
+            const fechaNacimiento = inputFecha.value;
+            errorTxt.style.display = 'none';
+
+            if (telefono.length !== 10) {
+                errorTxt.textContent = 'El número debe tener exactamente 10 dígitos.';
+                errorTxt.style.display = 'block';
+                inputTelefono.focus();
+                return;
+            }
+
             loyaltyQrCrearBtn.disabled = true;
             loyaltyQrCrearBtn.textContent = 'Verificando…';
             try {
-                const snap = await db.collection('mesaCuponera').get();
-                const yaExiste = snap.docs.some(d => (d.data().nombre || '').trim().toLowerCase() === nombre.toLowerCase());
-                if (yaExiste) {
-                    await avisarNombreDuplicado(nombre);
-                    loyaltyQrCrearBtn.disabled = false;
-                    loyaltyQrCrearBtn.textContent = 'Crear mi código';
-                    loyaltyQrInputNombre.focus();
+                const ref = db.collection('mesaCuponera').doc(telefono);
+                const existente = await ref.get();
+                if (existente.exists) {
+                    const datosExistente = existente.data();
+                    // Si ya está fusionada con una cuenta de Google, es de
+                    // solo lectura desde aquí: se muestra tal cual, sin
+                    // tocar sus datos (misma regla que meseros.html).
+                    if (!datosExistente.fusionadaConUid) {
+                        const actualizaciones = {};
+                        if (nombre && !datosExistente.nombre) actualizaciones.nombre = nombre;
+                        if (fechaNacimiento && !datosExistente.fechaNacimiento) actualizaciones.fechaNacimiento = fechaNacimiento;
+                        if (Object.keys(actualizaciones).length) {
+                            await ref.update(actualizaciones);
+                        }
+                    }
+                    localStorage.setItem(LOYALTY_QR_LS_KEY, telefono);
+                    loyaltyQrEscucharTarjeta(telefono);
                     return;
                 }
 
                 loyaltyQrCrearBtn.textContent = 'Creando…';
-                const id = generarIdLoyaltyQr();
-                await db.collection('mesaCuponera').doc(id).set({
-                    nombre: nombre,
+                const datosTarjeta = {
+                    telefono: telefono,
                     ordersCompleted: 0,
                     freeDishesAvailable: 0,
                     creada: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                localStorage.setItem(LOYALTY_QR_LS_KEY, id);
-                loyaltyQrEscucharTarjeta(id);
+                };
+                if (nombre) datosTarjeta.nombre = nombre;
+                if (fechaNacimiento) datosTarjeta.fechaNacimiento = fechaNacimiento;
+                await ref.set(datosTarjeta);
+                localStorage.setItem(LOYALTY_QR_LS_KEY, telefono);
+                loyaltyQrEscucharTarjeta(telefono);
             } catch (err) {
                 console.error('Error creando tu código:', err);
                 alert('No se pudo crear tu código. Intenta de nuevo.');
@@ -5484,7 +5541,9 @@
 
         loyaltyQrReiniciarBtn.addEventListener('click', () => {
             localStorage.removeItem(LOYALTY_QR_LS_KEY);
+            document.getElementById('loyaltyQrInputTelefono').value = '';
             loyaltyQrInputNombre.value = '';
+            document.getElementById('loyaltyQrInputFecha').value = '';
             loyaltyQrMostrarPasoNombre();
         });
 
