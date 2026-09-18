@@ -313,6 +313,50 @@
     /* ===== CUPONERA (escáner de QR) ===== */
     #cuponScreen { padding-bottom: 30px; }
     #readerCupon { border-radius: 16px; overflow: hidden; margin: 12px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+
+    /* La librería html5-qrcode viene con sus propios botones/textos en
+       inglés y estilo genérico de navegador. Aquí se restilizan sus
+       elementos (los textos se traducen aparte, por JS, en
+       traducirScannerCupon). Todo con !important porque la librería mete
+       estilos inline. */
+    #readerCupon { background: #fff; padding: 18px 16px 22px; }
+    #readerCupon button {
+        background: var(--primary) !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 12px 22px !important;
+        font-family: inherit !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        margin: 6px 4px !important;
+    }
+    #readerCupon button:hover { filter: brightness(1.08); }
+    #readerCupon select {
+        border-radius: 10px !important;
+        padding: 8px 14px !important;
+        border: 2px solid var(--primary) !important;
+        font-family: inherit !important;
+        font-size: 14px !important;
+        background: #fff !important;
+        margin: 6px 0 !important;
+    }
+    #readerCupon a {
+        color: var(--primary) !important;
+        font-weight: 600 !important;
+        text-decoration: underline !important;
+        font-family: inherit !important;
+        font-size: 14px !important;
+    }
+    #readerCupon span, #readerCupon div, #readerCupon p {
+        font-family: inherit !important;
+    }
+    #readerCupon fieldset, #readerCupon > div > div {
+        border: none !important;
+    }
+    #readerCupon img[alt="Info icon"] { opacity: 0.6; }
     .resultado-cupon {
         display: none;
         background: white;
@@ -1201,6 +1245,42 @@
 
     let limpiandoScanner = null;
 
+    // El widget de html5-qrcode genera sus botones y textos en inglés, y
+    // los reconstruye varias veces (al cargar, al pedir permiso, al listar
+    // cámaras, al iniciar/detener). En vez de tocar la librería, se traduce
+    // por fuera: un observador ve cada vez que agrega o cambia texto dentro
+    // de #readerCupon y reemplaza las frases conocidas por su versión en
+    // español. Si la librería agrega una frase que no está en el
+    // diccionario, simplemente se queda en inglés (no rompe nada).
+    const TRADUCCIONES_SCANNER = {
+        'Request Camera Permissions': 'Dar permiso de cámara',
+        'Scan an Image File': 'Escanear una imagen',
+        'Scan using camera directly': 'Usar la cámara',
+        'Start Scanning': 'Iniciar escaneo',
+        'Stop Scanning': 'Detener escaneo',
+        'Switch On Torch': 'Encender flash',
+        'Switch Off Torch': 'Apagar flash',
+        'Select Camera': 'Elegir cámara',
+        'Zoom': 'Zoom',
+        'Loading...': 'Cargando…',
+        'Requesting camera permissions...': 'Pidiendo permiso de cámara…',
+        'No cameras found.': 'No se encontró ninguna cámara.',
+        'Camera access denied': 'No se dio permiso de cámara',
+        'Or drop an image to scan': 'O arrastra aquí una imagen para escanear',
+        'Report issues': 'Reportar un problema'
+    };
+    let scannerCuponObserver = null;
+
+    function traducirScannerCupon() {
+        const contenedor = document.getElementById('readerCupon');
+        if (!contenedor) return;
+        contenedor.querySelectorAll('button, a, span, option, label').forEach(el => {
+            if (el.children.length > 0) return; // solo nodos de texto puro
+            const texto = (el.textContent || '').trim();
+            if (TRADUCCIONES_SCANNER[texto]) el.textContent = TRADUCCIONES_SCANNER[texto];
+        });
+    }
+
     async function iniciarScannerCuponSiHaceFalta() {
         if (scannerCuponIniciado) return;
         scannerCuponIniciado = true;
@@ -1213,6 +1293,13 @@
             rememberLastUsedCamera: true
         }, false);
         scannerCupon.render(onScanCuponSuccess, () => { /* se ignoran los fotogramas sin QR */ });
+
+        traducirScannerCupon();
+        if (!scannerCuponObserver) {
+            const contenedor = document.getElementById('readerCupon');
+            scannerCuponObserver = new MutationObserver(() => traducirScannerCupon());
+            scannerCuponObserver.observe(contenedor, { childList: true, subtree: true, characterData: true });
+        }
     }
 
     function pausarScannerCupon() {
