@@ -360,6 +360,17 @@
     #readerCupon button i, #readerCupon a i {
         margin-right: 6px;
     }
+    .permiso-camara-msg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: #2e7d32;
+        font-weight: 600;
+        font-size: 15px;
+        margin: 10px 0;
+    }
+    .permiso-camara-msg i { color: #2e7d32; }
     .resultado-cupon {
         display: none;
         background: white;
@@ -1329,6 +1340,45 @@
                 ? `<i class="fas ${traduccion.icon}"></i> ${traduccion.text}`
                 : traduccion.text;
         });
+
+        // No se usa la cámara frontal para nada en este negocio (los
+        // mesero escanean el QR del cliente con la trasera). En vez de
+        // dejar que el mesero tenga que elegir manualmente, se selecciona
+        // sola la trasera y se oculta el selector — mostrando nada más un
+        // aviso de que el permiso ya se concedió.
+        const selectCamara = contenedor.querySelector('select');
+        if (selectCamara && !selectCamara.dataset.autoAjustada) {
+            let idxTrasera = -1;
+            for (let i = 0; i < selectCamara.options.length; i++) {
+                if (/trasera|back|rear|environment/i.test(selectCamara.options[i].textContent)) {
+                    idxTrasera = i;
+                    break;
+                }
+            }
+            if (idxTrasera >= 0 && selectCamara.selectedIndex !== idxTrasera) {
+                selectCamara.selectedIndex = idxTrasera;
+                selectCamara.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            // Solo se marca como "ya ajustada" si de verdad se encontró
+            // una cámara trasera identificable; si no, se deja visible el
+            // selector normal para que el mesero elija a mano.
+            if (idxTrasera >= 0) selectCamara.dataset.autoAjustada = '1';
+        }
+        if (selectCamara && selectCamara.dataset.autoAjustada) {
+            selectCamara.style.display = 'none';
+            contenedor.querySelectorAll('span, label, div').forEach(el => {
+                if (el === selectCamara || el.contains(selectCamara)) return;
+                if (el.children.length > 0) return;
+                const t = (el.textContent || '').trim();
+                if (/^(Select Camera|Elegir cámara)/i.test(t)) el.style.display = 'none';
+            });
+            if (!contenedor.querySelector('.permiso-camara-msg')) {
+                const aviso = document.createElement('div');
+                aviso.className = 'permiso-camara-msg';
+                aviso.innerHTML = '<i class="fas fa-check-circle"></i> Permiso de cámara concedido';
+                selectCamara.insertAdjacentElement('afterend', aviso);
+            }
+        }
     }
 
     async function iniciarScannerCuponSiHaceFalta() {
