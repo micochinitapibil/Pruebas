@@ -357,6 +357,9 @@
         border: none !important;
     }
     #readerCupon img[alt="Info icon"] { opacity: 0.6; }
+    #readerCupon button i, #readerCupon a i {
+        margin-right: 6px;
+    }
     .resultado-cupon {
         display: none;
         background: white;
@@ -1253,31 +1256,50 @@
     // español. Si la librería agrega una frase que no está en el
     // diccionario, simplemente se queda en inglés (no rompe nada).
     const TRADUCCIONES_SCANNER = {
-        'Request Camera Permissions': 'Dar permiso de cámara',
-        'Scan an Image File': 'Escanear una imagen',
-        'Scan using camera directly': 'Usar la cámara',
-        'Start Scanning': 'Iniciar escaneo',
-        'Stop Scanning': 'Detener escaneo',
-        'Switch On Torch': 'Encender flash',
-        'Switch Off Torch': 'Apagar flash',
-        'Select Camera': 'Elegir cámara',
-        'Zoom': 'Zoom',
-        'Loading...': 'Cargando…',
-        'Requesting camera permissions...': 'Pidiendo permiso de cámara…',
-        'No cameras found.': 'No se encontró ninguna cámara.',
-        'Camera access denied': 'No se dio permiso de cámara',
-        'Or drop an image to scan': 'O arrastra aquí una imagen para escanear',
-        'Report issues': 'Reportar un problema'
+        'Request Camera Permissions': { icon: 'fa-camera', text: 'Dar permiso de cámara' },
+        'Scan an Image File': { icon: 'fa-image', text: 'Escanear una imagen' },
+        'Scan using camera directly': { icon: 'fa-camera', text: 'Usar la cámara' },
+        'Start Scanning': { icon: 'fa-qrcode', text: 'Iniciar escaneo' },
+        'Stop Scanning': { icon: 'fa-stop-circle', text: 'Detener escaneo' },
+        'Switch On Torch': { icon: 'fa-bolt', text: 'Encender flash' },
+        'Switch Off Torch': { icon: 'fa-bolt', text: 'Apagar flash' },
+        'Select Camera': { text: 'Elegir cámara' },
+        'Zoom': { text: 'Zoom' },
+        'Loading...': { icon: 'fa-spinner fa-spin', text: 'Cargando…' },
+        'Requesting camera permissions...': { icon: 'fa-spinner fa-spin', text: 'Pidiendo permiso de cámara…' },
+        'No cameras found.': { text: 'No se encontró ninguna cámara.' },
+        'Camera access denied': { text: 'No se dio permiso de cámara' },
+        'Or drop an image to scan': { text: 'O arrastra aquí una imagen para escanear' },
+        'Report issues': { icon: 'fa-flag', text: 'Reportar un problema' }
     };
     let scannerCuponObserver = null;
 
     function traducirScannerCupon() {
         const contenedor = document.getElementById('readerCupon');
         if (!contenedor) return;
+
+        // Caso especial: el botón de elegir imagen viene con un texto
+        // compuesto tipo "Choose Image - No image choosen" (o el nombre
+        // del archivo una vez elegido), no una frase exacta.
+        contenedor.querySelectorAll('button, label').forEach(el => {
+            const texto = (el.textContent || '').trim();
+            if (!texto.startsWith('Choose Image')) return;
+            const partes = texto.split(' - ');
+            const nombreArchivo = partes[1] && partes[1] !== 'No image choosen' ? partes[1] : null;
+            el.innerHTML = nombreArchivo
+                ? `<i class="fas fa-image"></i> Imagen elegida: ${nombreArchivo}`
+                : '<i class="fas fa-image"></i> Elegir una imagen';
+        });
+
         contenedor.querySelectorAll('button, a, span, option, label').forEach(el => {
             if (el.children.length > 0) return; // solo nodos de texto puro
             const texto = (el.textContent || '').trim();
-            if (TRADUCCIONES_SCANNER[texto]) el.textContent = TRADUCCIONES_SCANNER[texto];
+            const traduccion = TRADUCCIONES_SCANNER[texto];
+            if (!traduccion) return;
+            const esClicable = el.tagName === 'BUTTON' || el.tagName === 'A';
+            el.innerHTML = (esClicable && traduccion.icon)
+                ? `<i class="fas ${traduccion.icon}"></i> ${traduccion.text}`
+                : traduccion.text;
         });
     }
 
