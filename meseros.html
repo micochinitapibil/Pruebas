@@ -344,11 +344,24 @@
         margin: 6px 0 !important;
     }
     #readerCupon a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         color: var(--primary) !important;
-        font-weight: 600 !important;
-        text-decoration: underline !important;
+        font-weight: 700 !important;
+        text-decoration: none !important;
         font-family: inherit !important;
         font-size: 14px !important;
+        background: #fdf6e3;
+        border: 2px solid var(--primary);
+        border-radius: 14px;
+        padding: 11px 20px;
+        margin-top: 12px !important;
+        transition: background 0.15s, color 0.15s;
+    }
+    #readerCupon a:active {
+        background: var(--primary);
+        color: #fff !important;
     }
     #readerCupon span, #readerCupon div, #readerCupon p {
         font-family: inherit !important;
@@ -396,12 +409,60 @@
         border-radius: 14px; padding: 14px;
         margin: 12px 16px; font-size: 13.5px; text-align: center;
     }
-    .busqueda-cupon-manual { margin: 18px 16px 0; text-align: center; }
-    .busqueda-cupon-manual summary { font-size: 12.5px; color: #a08a5f; cursor: pointer; }
+    .busqueda-cupon-manual { margin: 14px 16px 0; }
+    .busqueda-cupon-manual summary {
+        list-style: none;
+        cursor: pointer;
+        font-size: 14.5px;
+        font-weight: 700;
+        color: var(--primary);
+        background: #fff;
+        border: 2px solid var(--primary);
+        border-radius: 14px;
+        padding: 13px 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+        transition: background 0.15s, color 0.15s;
+    }
+    .busqueda-cupon-manual summary::-webkit-details-marker { display: none; }
+    .busqueda-cupon-manual summary::marker { content: ''; }
+    .busqueda-cupon-manual summary::before {
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 17px;
+    }
+    .busqueda-cupon-manual:nth-of-type(1) summary::before { content: '\f002'; } /* fa-search */
+    .busqueda-cupon-manual:nth-of-type(2) summary::before { content: '\f234'; } /* fa-user-plus */
+    .busqueda-cupon-manual summary::after {
+        content: '\f078'; /* fa-chevron-down */
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        font-size: 13px;
+        margin-left: auto;
+        transition: transform 0.2s;
+    }
+    .busqueda-cupon-manual[open] summary {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        background: var(--primary);
+        color: #fff;
+    }
+    .busqueda-cupon-manual[open] summary::after { transform: rotate(180deg); }
+    .busqueda-cupon-manual[open] {
+        background: #fff;
+        border: 2px solid var(--primary);
+        border-top: none;
+        border-radius: 0 0 14px 14px;
+        padding-bottom: 14px;
+    }
     .busqueda-cupon-manual input {
         width: 100%; border: 2px solid var(--primary); border-radius: 12px;
         padding: 11px 14px; font-family: inherit; font-size: 13.5px; margin: 10px 0;
+        box-sizing: border-box;
     }
+    .busqueda-cupon-manual[open] input:first-of-type { margin-top: 14px; }
     .resultado-item-cupon {
         background: white; border-radius: 12px; padding: 10px 14px;
         margin-bottom: 8px; font-size: 13.5px; cursor: pointer; text-align: left;
@@ -1341,6 +1402,22 @@
                 : traduccion.text;
         });
 
+        // "Select Camera (2)" y "Or drop an image to scan" no son
+        // elementos propios con su propio texto: son nodos de TEXTO
+        // sueltos, mezclados en el mismo contenedor que el <select> o el
+        // botón de elegir imagen (por eso las dos pasadas de arriba, que
+        // solo miran elementos, nunca los tocaban). Aquí se recorren los
+        // nodos de texto de verdad y se borra su contenido.
+        const walker = document.createTreeWalker(contenedor, NodeFilter.SHOW_TEXT);
+        let nodoTexto;
+        while ((nodoTexto = walker.nextNode())) {
+            const t = nodoTexto.textContent.trim();
+            if (!t) continue;
+            if (/^Select Camera/i.test(t) || /^Or drop an image to scan$/i.test(t)) {
+                nodoTexto.textContent = '';
+            }
+        }
+
         // No se usa la cámara frontal para nada en este negocio (los
         // mesero escanean el QR del cliente con la trasera). En vez de
         // dejar que el mesero tenga que elegir manualmente, se selecciona
@@ -1361,17 +1438,12 @@
             }
             // Solo se marca como "ya ajustada" si de verdad se encontró
             // una cámara trasera identificable; si no, se deja visible el
-            // selector normal para que el mesero elija a mano.
+            // selector normal (ya sin la etiqueta en inglés, ver arriba)
+            // para que el mesero elija a mano.
             if (idxTrasera >= 0) selectCamara.dataset.autoAjustada = '1';
         }
         if (selectCamara && selectCamara.dataset.autoAjustada) {
             selectCamara.style.display = 'none';
-            contenedor.querySelectorAll('span, label, div').forEach(el => {
-                if (el === selectCamara || el.contains(selectCamara)) return;
-                if (el.children.length > 0) return;
-                const t = (el.textContent || '').trim();
-                if (/^(Select Camera|Elegir cámara)/i.test(t)) el.style.display = 'none';
-            });
             if (!contenedor.querySelector('.permiso-camara-msg')) {
                 const aviso = document.createElement('div');
                 aviso.className = 'permiso-camara-msg';
