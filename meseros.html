@@ -1278,22 +1278,50 @@
         const contenedor = document.getElementById('readerCupon');
         if (!contenedor) return;
 
-        // Caso especial: el botón de elegir imagen viene con un texto
-        // compuesto tipo "Choose Image - No image choosen" (o el nombre
-        // del archivo una vez elegido), no una frase exacta.
+        // Caso especial: el botón de elegir imagen suele envolver, oculto
+        // adentro, el <input type="file"> real (así el navegador abre la
+        // galería al hacer clic). Si se reemplaza con innerHTML se borra
+        // ese input y el botón deja de funcionar — por eso aquí solo se
+        // tocan los nodos de TEXTO, dejando intacto cualquier elemento
+        // hijo (el input, o el ícono ya insertado en una pasada anterior).
         contenedor.querySelectorAll('button, label').forEach(el => {
-            const texto = (el.textContent || '').trim();
-            if (!texto.startsWith('Choose Image')) return;
-            const partes = texto.split(' - ');
-            const nombreArchivo = partes[1] && partes[1] !== 'No image choosen' ? partes[1] : null;
-            el.innerHTML = nombreArchivo
-                ? `<i class="fas fa-image"></i> Imagen elegida: ${nombreArchivo}`
-                : '<i class="fas fa-image"></i> Elegir una imagen';
+            let textoPropio = '';
+            el.childNodes.forEach(n => { if (n.nodeType === Node.TEXT_NODE) textoPropio += n.textContent; });
+            textoPropio = textoPropio.trim();
+            if (!textoPropio.startsWith('Choose Image')) return;
+
+            const partes = textoPropio.split(' - ');
+            const nombreArchivo = partes[1] && partes[1].trim() !== 'No image choosen' ? partes[1].trim() : null;
+            const nuevoTexto = nombreArchivo ? `Imagen elegida: ${nombreArchivo}` : 'Elegir una imagen';
+
+            Array.from(el.childNodes).forEach(n => { if (n.nodeType === Node.TEXT_NODE) el.removeChild(n); });
+            if (!el.querySelector('i.fa-image')) {
+                const icono = document.createElement('i');
+                icono.className = 'fas fa-image';
+                el.insertBefore(icono, el.firstChild);
+            }
+            el.appendChild(document.createTextNode(' ' + nuevoTexto));
         });
 
         contenedor.querySelectorAll('button, a, span, option, label').forEach(el => {
             if (el.children.length > 0) return; // solo nodos de texto puro
             const texto = (el.textContent || '').trim();
+
+            // "Select Camera (2)" y similares: el número de cámaras es
+            // dinámico, no hay una frase exacta que traducir.
+            if (/^Select Camera/i.test(texto)) {
+                el.textContent = texto.replace(/^Select Camera/i, 'Elegir cámara');
+                return;
+            }
+            // Cuando el navegador no da nombre a la cámara, la librería
+            // arma uno tipo "camera 1, facing front" — también dinámico.
+            const matchCamara = texto.match(/^camera (\d+), facing (front|back|user|environment)$/i);
+            if (matchCamara) {
+                const orientacion = /front|user/i.test(matchCamara[2]) ? 'frontal' : 'trasera';
+                el.textContent = `Cámara ${matchCamara[1]} (${orientacion})`;
+                return;
+            }
+
             const traduccion = TRADUCCIONES_SCANNER[texto];
             if (!traduccion) return;
             const esClicable = el.tagName === 'BUTTON' || el.tagName === 'A';
