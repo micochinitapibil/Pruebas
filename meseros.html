@@ -684,6 +684,18 @@
     </div>
 </div>
 
+<!-- ===== SUGERENCIA AUTOMÁTICA DE COCHICOMBO ===== -->
+<div class="overlay" id="comboSuggestOverlay" hidden>
+    <div class="hoja" style="text-align:center;">
+        <div style="font-size:38px;margin-bottom:6px;">🎁</div>
+        <h2 id="comboSuggestTitulo">¡Arma un CochiCombo!</h2>
+        <p id="comboSuggestTexto" style="font-size:14px;color:#666;line-height:1.5;margin:10px 0 6px;text-align:left;"></p>
+        <p id="comboSuggestAhorro" style="font-size:14px;font-weight:800;color:#2f7a56;margin-bottom:18px;"></p>
+        <button type="button" class="btn-primario" id="comboSuggestSiBtn">Sí, cambiar a combo</button>
+        <button type="button" class="btn-secundario" id="comboSuggestNoBtn">No, gracias</button>
+    </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1028,7 +1040,7 @@
         liveImageMap = {};
         snap.forEach(doc => {
             const d = doc.data();
-            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable, desc: d.desc || '' });
+            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable, desc: d.desc || '', comboItems: Array.isArray(d.comboItems) ? d.comboItems : [] });
             if (d.imageValue) {
                 liveImageMap[d.name] = d.imageSource === 'cloudinary' ? d.imageValue : IMAGE_BASE_URL + d.imageValue;
             }
@@ -1089,6 +1101,7 @@
                 pedidoEnCurso[nombre].qty++;
                 renderMenuLista(filtroActual);
                 actualizarBarraResumen();
+                checkComboSuggestions();
             });
             const btnQuitar = card.querySelector('[data-accion="quitar"]');
             if (btnQuitar) {
@@ -1098,6 +1111,9 @@
                     if (pedidoEnCurso[nombre].qty <= 0) delete pedidoEnCurso[nombre];
                     renderMenuLista(filtroActual);
                     actualizarBarraResumen();
+                    // Si el mesero quita algo, un combo antes rechazado podría
+                    // volver a tener sentido más adelante.
+                    dismissedCombos.clear();
                 });
             }
         });
@@ -1113,6 +1129,149 @@
         barra.removeAttribute('hidden');
     }
 
+    // ==================================================
+    // DETECCIÓN AUTOMÁTICA DE COCHICOMBOS (mismo criterio que index.html)
+    // Cuando el pedido en curso ya trae, sueltas, todas las piezas
+    // que pide un combo (por producto exacto o por categoría genérica,
+    // ej. "cualquier Bebida"), se le ofrece al mesero cambiarlas por
+    // el combo, que sale más barato.
+    // ==================================================
+    const comboSuggestOverlay = document.getElementById('comboSuggestOverlay');
+    const comboSuggestTexto = document.getElementById('comboSuggestTexto');
+    const comboSuggestAhorro = document.getElementById('comboSuggestAhorro');
+    const comboSuggestSiBtn = document.getElementById('comboSuggestSiBtn');
+    const comboSuggestNoBtn = document.getElementById('comboSuggestNoBtn');
+
+    const CATEGORY_LABELS_ES = {
+        tradicionales: 'platillo tradicional', promociones: 'promoción', especiales: 'CochiCombo',
+        antojitos: 'antojito', cochipaqs: 'CochiPaq', aguas: 'bebida', extras: 'extra'
+    };
+
+    let dismissedCombos = new Set(); // combos que el mesero ya rechazó para este pedido
+    let pendingCombo = null;
+
+    function getActiveCombos() {
+        return menuItems.filter(m => m.category === 'especiales' && Array.isArray(m.comboItems) && m.comboItems.length > 0);
+    }
+
+    function getProductCategory(name) {
+        const p = menuItems.find(m => m.name === name);
+        return p ? p.category : null;
+    }
+
+    // Solo las piezas pagadas cuentan para armar un combo automáticamente
+    // (un platillo gratis de cupón no se toca ni se cambia por un combo).
+    function pedidoPagadoArray() {
+        return Object.values(pedidoEnCurso).filter(it => !it.gratis);
+    }
+
+    function cartCoversCombo(combo) {
+        const items = pedidoPagadoArray();
+        for (const req of combo.comboItems) {
+            if (req.name) {
+                const found = items.find(c => c.name === req.name);
+                if (!found || found.qty < req.qty) return false;
+            } else if (req.category) {
+                const total = items.filter(c => getProductCategory(c.name) === req.category).reduce((s, c) => s + c.qty, 0);
+                if (total < req.qty) return false;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function describeComboRequirement(req) {
+        if (req.name) return `${req.qty}x ${req.name}`;
+        const label = CATEGORY_LABELS_ES[req.category] || req.category;
+        return `${req.qty}x ${label}`;
+    }
+
+    function checkComboSuggestions() {
+        if (!comboSuggestOverlay.hasAttribute('hidden')) return; // ya hay una en pantalla
+        const combos = getActiveCombos();
+        for (const combo of combos) {
+            if (dismissedCombos.has(combo.name)) continue;
+            if (pedidoEnCurso[combo.name]) continue; // ya lo trae tal cual el pedido
+            if (cartCoversCombo(combo)) {
+                showComboSuggestion(combo);
+                return; // una sugerencia a la vez
+            }
+        }
+    }
+
+    function showComboSuggestion(combo) {
+        pendingCombo = combo;
+        const piezas = combo.comboItems.map(describeComboRequirement).join(' + ');
+        comboSuggestTexto.textContent = `Este pedido ya trae ${piezas}, justo lo que lleva el combo "${combo.name}".`;
+
+        const piezasArray = pedidoPagadoArray();
+        const piecesPrice = combo.comboItems.reduce((sum, req) => {
+            if (req.name) {
+                const prod = menuItems.find(m => m.name === req.name);
+                return sum + (prod ? prod.price : 0) * req.qty;
+            }
+            const enCategoria = piezasArray.find(c => getProductCategory(c.name) === req.category);
+            return sum + (enCategoria ? enCategoria.price : 0) * req.qty;
+        }, 0);
+        const savings = piecesPrice - combo.price;
+
+        comboSuggestAhorro.textContent = savings > 0
+            ? `Cámbialo por MX$${combo.price.toFixed(2)} y ahorra MX$${savings.toFixed(2)}`
+            : `Precio del combo: MX$${combo.price.toFixed(2)}`;
+
+        comboSuggestOverlay.removeAttribute('hidden');
+    }
+
+    function closeComboSuggestion() {
+        comboSuggestOverlay.setAttribute('hidden', '');
+        pendingCombo = null;
+    }
+
+    comboSuggestSiBtn.addEventListener('click', () => {
+        if (!pendingCombo) return;
+        const combo = pendingCombo;
+
+        combo.comboItems.forEach(req => {
+            if (req.name) {
+                const found = pedidoEnCurso[req.name];
+                if (found && !found.gratis) {
+                    found.qty -= req.qty;
+                    if (found.qty <= 0) delete pedidoEnCurso[req.name];
+                }
+            } else if (req.category) {
+                let remaining = req.qty;
+                Object.keys(pedidoEnCurso).forEach(key => {
+                    if (remaining <= 0) return;
+                    const it = pedidoEnCurso[key];
+                    if (it.gratis || getProductCategory(it.name) !== req.category) return;
+                    const take = Math.min(it.qty, remaining);
+                    it.qty -= take;
+                    remaining -= take;
+                    if (it.qty <= 0) delete pedidoEnCurso[key];
+                });
+            }
+        });
+
+        if (!pedidoEnCurso[combo.name]) {
+            pedidoEnCurso[combo.name] = { name: combo.name, price: combo.price, qty: 0 };
+        }
+        pedidoEnCurso[combo.name].qty++;
+
+        renderMenuLista(filtroActual);
+        actualizarBarraResumen();
+        closeComboSuggestion();
+    });
+
+    comboSuggestNoBtn.addEventListener('click', () => {
+        if (pendingCombo) dismissedCombos.add(pendingCombo.name);
+        closeComboSuggestion();
+    });
+
+    comboSuggestOverlay.addEventListener('click', (e) => {
+        if (e.target === comboSuggestOverlay) comboSuggestNoBtn.click();
+    });
+
     let etiquetaGuardar = 'Guardar pedido';
 
     function abrirMenuParaMesa(num) {
@@ -1121,6 +1280,7 @@
         // activo, esto es una ronda nueva de platillos que se agrega a la
         // comanda existente — no se vuelve a mostrar lo que ya se pidió.
         pedidoEnCurso = {};
+        dismissedCombos.clear();
 
         const dataActual = mesasData[num] || {};
         const hayComandaActiva = !!dataActual.comandaId;
@@ -1275,7 +1435,7 @@
             mostrarPantalla('tablesScreen');
         } catch (err) {
             console.error('Error guardando el pedido:', err);
-            alert('No se pudo guardar el pedido. Intenta de nuevo.');
+            alert('No se pudo guardar el pedido.\n\nDetalle técnico: ' + (err && err.message ? err.message : err));
         } finally {
             btn.disabled = false;
             btn.textContent = etiquetaGuardar;
