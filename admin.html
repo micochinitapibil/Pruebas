@@ -257,6 +257,36 @@
     .icon-btn:active { background: #f0e9d6; }
     .icon-btn.del { color: var(--red); }
 
+    .combo-row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .combo-row select,
+    .combo-row input[type="number"] {
+        margin: 0;
+    }
+    .combo-row .combo-type-select { flex: 0 0 118px; }
+    .combo-row .combo-value-select { flex: 1; min-width: 0; }
+    .combo-row .combo-qty-input { flex: 0 0 56px; text-align: center; }
+    .combo-row .combo-remove-btn {
+        flex: 0 0 auto;
+        background: #f2f2f2;
+        border: none;
+        border-radius: 8px;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+        color: #c0392b;
+        font-weight: 700;
+    }
+    .combo-empty-hint {
+        font-size: 12px;
+        color: #999;
+        margin-bottom: 8px;
+    }
+
     .category-group h4 {
         font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
         color: var(--primary); margin: 24px 0 6px; border-bottom: 2px solid var(--light);
@@ -464,6 +494,12 @@
         <div class="field">
             <label>Descripción</label>
             <textarea id="f_desc" rows="2"></textarea>
+        </div>
+
+        <div class="field" id="comboBuilderField" style="display:none;">
+            <label>Componentes del combo (el sistema detecta solo cuando el cliente arma este pedido por piezas sueltas y le ofrece cambiar al combo)</label>
+            <div id="comboRowsWrap"></div>
+            <button type="button" class="btn btn-outline" id="addComboRowBtn" style="width:100%; margin-top:8px;">+ Agregar componente</button>
         </div>
 
         <div class="field">
@@ -984,7 +1020,89 @@
         document.getElementById('imagePreview').style.display = 'none';
         document.getElementById('uploadStatus').textContent = '';
         setImageSource('github');
+        comboRows = [];
+        renderComboRows();
+        toggleComboBuilder();
     }
+
+    // ==================================================
+    // CONSTRUCTOR DE COMPONENTES DE COCHICOMBOS
+    // Cada fila describe una pieza que debe aparecer en el
+    // pedido para que el sistema del cliente detecte que
+    // arma este combo: puede ser un producto específico
+    // ("Panucho" x3) o cualquier producto de una categoría
+    // genérica ("Bebidas" x1, para no forzar un sabor).
+    // ==================================================
+    let comboRows = [];
+
+    function toggleComboBuilder() {
+        const isCombo = document.getElementById('f_category').value === 'especiales';
+        document.getElementById('comboBuilderField').style.display = isCombo ? 'block' : 'none';
+    }
+    document.getElementById('f_category').addEventListener('change', toggleComboBuilder);
+
+    function comboComponentOptions(selectedName) {
+        // Productos existentes que no sean ellos mismos cochicombos
+        // (para no armar un combo hecho de otros combos).
+        return allProducts
+            .filter(p => p.category !== 'especiales')
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(p => `<option value="${p.name}" ${p.name === selectedName ? 'selected' : ''}>${p.name}</option>`)
+            .join('');
+    }
+
+    function comboCategoryOptions(selectedCat) {
+        return Object.keys(CATEGORY_LABELS)
+            .filter(cat => cat !== 'especiales')
+            .map(cat => `<option value="${cat}" ${cat === selectedCat ? 'selected' : ''}>Cualquiera de: ${CATEGORY_LABELS[cat]}</option>`)
+            .join('');
+    }
+
+    function renderComboRows() {
+        const wrap = document.getElementById('comboRowsWrap');
+        if (comboRows.length === 0) {
+            wrap.innerHTML = '<div class="combo-empty-hint">Agrega las piezas sueltas que forman este combo (ej. 3x Panucho + 1x cualquier Bebida).</div>';
+            return;
+        }
+        wrap.innerHTML = comboRows.map((row, i) => `
+            <div class="combo-row" data-idx="${i}">
+                <select class="combo-type-select">
+                    <option value="product" ${row.type === 'product' ? 'selected' : ''}>Producto</option>
+                    <option value="category" ${row.type === 'category' ? 'selected' : ''}>Categoría</option>
+                </select>
+                <select class="combo-value-select">
+                    ${row.type === 'product' ? comboComponentOptions(row.value) : comboCategoryOptions(row.value)}
+                </select>
+                <input type="number" class="combo-qty-input" min="1" step="1" value="${row.qty}">
+                <button type="button" class="combo-remove-btn" title="Quitar">×</button>
+            </div>
+        `).join('');
+
+        wrap.querySelectorAll('.combo-row').forEach(rowEl => {
+            const idx = parseInt(rowEl.dataset.idx, 10);
+            rowEl.querySelector('.combo-type-select').addEventListener('change', (e) => {
+                comboRows[idx].type = e.target.value;
+                comboRows[idx].value = '';
+                renderComboRows();
+            });
+            rowEl.querySelector('.combo-value-select').addEventListener('change', (e) => {
+                comboRows[idx].value = e.target.value;
+            });
+            rowEl.querySelector('.combo-qty-input').addEventListener('input', (e) => {
+                comboRows[idx].qty = Math.max(1, parseInt(e.target.value, 10) || 1);
+            });
+            rowEl.querySelector('.combo-remove-btn').addEventListener('click', () => {
+                comboRows.splice(idx, 1);
+                renderComboRows();
+            });
+        });
+    }
+
+    document.getElementById('addComboRowBtn').addEventListener('click', () => {
+        const firstOption = allProducts.find(p => p.category !== 'especiales');
+        comboRows.push({ type: 'product', value: firstOption ? firstOption.name : '', qty: 1 });
+        renderComboRows();
+    });
 
     function setImageSource(src) {
         currentImageSource = src;
@@ -1055,6 +1173,13 @@
             setImageSource('github');
             document.getElementById('f_image_github').value = p.imageValue || '';
         }
+        comboRows = Array.isArray(p.comboItems) ? p.comboItems.map(c => ({
+            type: c.category ? 'category' : 'product',
+            value: c.category || c.name || '',
+            qty: c.qty || 1
+        })) : [];
+        renderComboRows();
+        toggleComboBuilder();
         modal.style.display = 'flex';
     }
 
@@ -1081,7 +1206,16 @@
             imageValue = uploadedCloudinaryUrl || '';
         }
 
-        const data = { name, price, category, desc, active, redeemable, imageSource, imageValue };
+        // Solo los cochicombos (categoría "especiales") guardan sus
+        // componentes; para cualquier otra categoría se guarda vacío
+        // para no dejar datos viejos de combo si cambia de categoría.
+        const comboItems = category === 'especiales'
+            ? comboRows
+                .filter(r => r.value)
+                .map(r => r.type === 'category' ? { category: r.value, qty: r.qty } : { name: r.value, qty: r.qty })
+            : [];
+
+        const data = { name, price, category, desc, active, redeemable, imageSource, imageValue, comboItems };
 
         if (editingId) {
             productosRef.doc(editingId).update(data)

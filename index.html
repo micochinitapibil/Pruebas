@@ -1205,6 +1205,112 @@
         }
 
         /* ============================================
+           MODAL: SUGERENCIA AUTOMÁTICA DE COCHICOMBO
+           Aparece cuando el sistema detecta que lo que el
+           cliente ya trae en el carrito, pieza por pieza,
+           arma un combo existente y más barato.
+        ============================================ */
+        .combo-suggest-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(36, 27, 16, 0.65);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 2250;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .combo-suggest-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .combo-suggest-modal {
+            background: white;
+            border-radius: 20px;
+            padding: 32px 26px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            transform: scale(0.92) translateY(10px);
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+        }
+
+        .combo-suggest-overlay.active .combo-suggest-modal {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .combo-suggest-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            font-size: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+
+        .combo-suggest-title {
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .combo-suggest-text {
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .combo-suggest-savings {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--green, #2e8b57);
+            margin-bottom: 22px;
+        }
+
+        .combo-suggest-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .combo-suggest-no-btn,
+        .combo-suggest-yes-btn {
+            flex: 1;
+            padding: 12px 10px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+        }
+
+        .combo-suggest-no-btn {
+            background: #f2f2f2;
+            color: var(--text);
+        }
+
+        .combo-suggest-yes-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 6px 16px rgba(156, 122, 60, 0.3);
+        }
+
+        /* ============================================
            MODAL: ADICIONALES ANTES DE FINALIZAR PEDIDO
         ============================================ */
         .addons-overlay {
@@ -3326,6 +3432,20 @@
         </div>
     </div>
 
+    <!-- SUGERENCIA AUTOMÁTICA DE COCHICOMBO -->
+    <div class="combo-suggest-overlay" id="comboSuggestOverlay">
+        <div class="combo-suggest-modal">
+            <div class="combo-suggest-icon"><i class="fas fa-gift"></i></div>
+            <div class="combo-suggest-title" id="comboSuggestTitle">¡Arma tu CochiCombo!</div>
+            <p class="combo-suggest-text" id="comboSuggestText"></p>
+            <p class="combo-suggest-savings" id="comboSuggestSavings"></p>
+            <div class="combo-suggest-actions">
+                <button class="combo-suggest-no-btn" id="comboSuggestNoBtn">No, gracias</button>
+                <button class="combo-suggest-yes-btn" id="comboSuggestYesBtn">Sí, cambiar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- BOTÓN FLOTANTE: MI PEDIDO (arriba del botón de cuponera) -->
     <button type="button" class="order-fab" id="orderFab" aria-label="Ver mi pedido" hidden>
         📋
@@ -4291,7 +4411,8 @@
                         price: priceStr,
                         category: data.category,
                         desc: data.desc || '',
-                        redeemable: !!data.redeemable
+                        redeemable: !!data.redeemable,
+                        comboItems: Array.isArray(data.comboItems) ? data.comboItems : []
                     });
                     if (data.imageSource === 'cloudinary' && data.imageValue) {
                         liveImageMap[data.name] = data.imageValue;
@@ -4501,6 +4622,7 @@
                 cart.push({ name: item.name, price: item.price, qty: 1 });
             }
             updateCartBadge();
+            checkComboSuggestions();
         }
 
         function removeOneFromCart(name) {
@@ -4512,6 +4634,10 @@
             }
             updateCartBadge();
             renderCart();
+            // Si el cliente quita algo, puede que un combo que antes
+            // ya no aplique vuelva a tener sentido más adelante, así
+            // que soltamos los combos "no, gracias" ya vistos.
+            dismissedCombos.clear();
         }
 
         function addOneToCart(name) {
@@ -4520,7 +4646,151 @@
             existing.qty += 1;
             updateCartBadge();
             renderCart();
+            checkComboSuggestions();
         }
+
+        // ==================================================
+        // DETECCIÓN AUTOMÁTICA DE COCHICOMBOS
+        // Cuando el cliente arma su pedido con piezas sueltas
+        // (ej. 3 Panuchos + 1 Bebida) y eso corresponde exacto
+        // a un CochiCombo existente y más barato, se le ofrece
+        // cambiar automáticamente al combo.
+        // ==================================================
+        const comboSuggestOverlay = document.getElementById('comboSuggestOverlay');
+        const comboSuggestTitle = document.getElementById('comboSuggestTitle');
+        const comboSuggestText = document.getElementById('comboSuggestText');
+        const comboSuggestSavings = document.getElementById('comboSuggestSavings');
+        const comboSuggestYesBtn = document.getElementById('comboSuggestYesBtn');
+        const comboSuggestNoBtn = document.getElementById('comboSuggestNoBtn');
+
+        let dismissedCombos = new Set(); // nombres de combo que el cliente ya rechazó en esta sesión
+        let pendingCombo = null; // combo actualmente ofrecido en la ventana emergente
+
+        function getActiveCombos() {
+            return menuItems.filter(m => m.category === 'especiales' && Array.isArray(m.comboItems) && m.comboItems.length > 0);
+        }
+
+        function getProductCategory(name) {
+            const p = menuItems.find(m => m.name === name);
+            return p ? p.category : null;
+        }
+
+        // Revisa si el carrito ya trae, sueltas, todas las piezas que
+        // pide un combo. Para requisitos por producto exacto exige ese
+        // nombre; para requisitos por categoría (ej. "cualquier bebida")
+        // acepta cualquier producto de esa categoría, sumando cantidades.
+        function cartCoversCombo(combo) {
+            for (const req of combo.comboItems) {
+                if (req.name) {
+                    const found = cart.find(c => c.name === req.name);
+                    if (!found || found.qty < req.qty) return false;
+                } else if (req.category) {
+                    const totalInCategory = cart
+                        .filter(c => getProductCategory(c.name) === req.category)
+                        .reduce((sum, c) => sum + c.qty, 0);
+                    if (totalInCategory < req.qty) return false;
+                } else {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function checkComboSuggestions() {
+            if (comboSuggestOverlay.classList.contains('active')) return; // ya hay una en pantalla
+            const combos = getActiveCombos();
+            for (const combo of combos) {
+                if (dismissedCombos.has(combo.name)) continue;
+                // No sugerir un combo si el cliente ya lo trae tal cual en el carrito
+                if (cart.some(c => c.name === combo.name)) continue;
+                if (cartCoversCombo(combo)) {
+                    showComboSuggestion(combo);
+                    return; // una sugerencia a la vez
+                }
+            }
+        }
+
+        function describeComboRequirement(req) {
+            if (req.name) return `${req.qty}x ${req.name}`;
+            const label = CATEGORY_LABELS_ES[req.category] || req.category;
+            return `${req.qty}x ${label}`;
+        }
+
+        // Etiquetas legibles de categoría para el texto de la sugerencia
+        const CATEGORY_LABELS_ES = {
+            tradicionales: 'platillo tradicional', promociones: 'promoción', especiales: 'CochiCombo',
+            antojitos: 'antojito', cochipaqs: 'CochiPaq', aguas: 'bebida', extras: 'extra'
+        };
+
+        function showComboSuggestion(combo) {
+            pendingCombo = combo;
+            const piezas = combo.comboItems.map(describeComboRequirement).join(' + ');
+            comboSuggestText.textContent = `Tu pedido ya trae ${piezas}, justo lo que lleva el combo "${combo.name}".`;
+
+            const comboPrice = parsePrice(combo.price);
+            const piecesPrice = combo.comboItems.reduce((sum, req) => {
+                if (req.name) return sum + parsePrice((menuItems.find(m => m.name === req.name) || {}).price || '0') * req.qty;
+                // Para requisitos por categoría, toma el precio del producto de esa
+                // categoría que el cliente ya trae en el carrito (aproximado).
+                const inCart = cart.find(c => getProductCategory(c.name) === req.category);
+                return sum + (inCart ? parsePrice(inCart.price) * req.qty : 0);
+            }, 0);
+            const savings = piecesPrice - comboPrice;
+
+            comboSuggestSavings.textContent = savings > 0
+                ? `Cámbialo por ${combo.price} y ahorra ${formatPrice(savings)}`
+                : `Precio del combo: ${combo.price}`;
+
+            comboSuggestOverlay.classList.add('active');
+        }
+
+        function closeComboSuggestion() {
+            comboSuggestOverlay.classList.remove('active');
+            pendingCombo = null;
+        }
+
+        comboSuggestYesBtn.addEventListener('click', () => {
+            if (!pendingCombo) return;
+            const combo = pendingCombo;
+
+            // Descuenta del carrito las piezas sueltas que se cambian por el combo
+            combo.comboItems.forEach(req => {
+                if (req.name) {
+                    const found = cart.find(c => c.name === req.name);
+                    if (found) found.qty -= req.qty;
+                } else if (req.category) {
+                    let remaining = req.qty;
+                    cart.filter(c => getProductCategory(c.name) === req.category).forEach(c => {
+                        if (remaining <= 0) return;
+                        const take = Math.min(c.qty, remaining);
+                        c.qty -= take;
+                        remaining -= take;
+                    });
+                }
+            });
+            cart = cart.filter(c => c.qty > 0);
+
+            // Agrega el combo como un solo producto
+            const existingCombo = cart.find(c => c.name === combo.name);
+            if (existingCombo) {
+                existingCombo.qty += 1;
+            } else {
+                cart.push({ name: combo.name, price: combo.price, qty: 1 });
+            }
+
+            updateCartBadge();
+            renderCart();
+            closeComboSuggestion();
+        });
+
+        comboSuggestNoBtn.addEventListener('click', () => {
+            if (pendingCombo) dismissedCombos.add(pendingCombo.name);
+            closeComboSuggestion();
+        });
+
+        comboSuggestOverlay.addEventListener('click', (e) => {
+            if (e.target === comboSuggestOverlay) comboSuggestNoBtn.click();
+        });
 
         function getCartSubtotal() {
             return cart.reduce((sum, c) => sum + parsePrice(c.price) * c.qty, 0);
@@ -5687,7 +5957,7 @@
         (function () {
             const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
-                'productModalOverlay', 'cartOverlay', 'prepOverlay',
+                'productModalOverlay', 'cartOverlay', 'prepOverlay', 'comboSuggestOverlay',
                 'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
                 'orderModalOverlay', 'loyaltyModalOverlay',
                 ...hiddenBasedIds
@@ -5744,7 +6014,7 @@
         (function () {
             const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
-                'productModalOverlay', 'cartOverlay', 'prepOverlay',
+                'productModalOverlay', 'cartOverlay', 'prepOverlay', 'comboSuggestOverlay',
                 'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
                 'orderModalOverlay', 'loyaltyModalOverlay',
                 ...hiddenBasedIds
