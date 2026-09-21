@@ -623,6 +623,12 @@
         <div id="cuponDetalle" style="font-size:13px;color:#a08a5f;margin:-6px 0 6px;"></div>
         <div class="visitas" id="cuponVisitas"></div>
         <div class="gratis-tag" id="cuponGratis" style="display:none;"></div>
+        <div class="gratis-tag" id="cuponCumpleTag" style="display:none; background:#ffe3ec; color:#c2185b;">🎂 ¡Hoy es su cumpleaños!</div>
+
+        <div class="canje-cupon-section" id="cumpleCuponSection" style="display:none;">
+            <div class="titulo-canje">🎂 Elige el platillo de regalo de cumpleaños</div>
+            <div id="listaCumple"></div>
+        </div>
 
         <div class="canje-cupon-section" id="canjeCuponSection">
             <div class="titulo-canje">🎁 Elige el platillo a canjear</div>
@@ -1059,7 +1065,7 @@
         liveImageMap = {};
         snap.forEach(doc => {
             const d = doc.data();
-            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable, desc: d.desc || '', comboItems: Array.isArray(d.comboItems) ? d.comboItems : [] });
+            menuItems.push({ name: d.name, price: Number(d.price), category: d.category, redeemable: !!d.redeemable, redeemableBirthday: !!d.redeemableBirthday, desc: d.desc || '', comboItems: Array.isArray(d.comboItems) ? d.comboItems : [] });
             if (d.imageValue) {
                 liveImageMap[d.name] = d.imageSource === 'cloudinary' ? d.imageValue : IMAGE_BASE_URL + d.imageValue;
             }
@@ -1335,7 +1341,7 @@
         box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#2f7a56;margin-bottom:4px;">🎁 Platillos gratis en este pedido</div>' +
             gratis.map(([key, it]) => `
                 <div class="gratis-chip" data-key="${key}">
-                    <span>${it.name}</span>
+                    <span>${it.esCumple ? '🎂 ' : ''}${it.name}</span>
                     <span class="quitar-gratis" data-key="${key}">Quitar</span>
                 </div>
             `).join('');
@@ -1345,7 +1351,25 @@
                 const it = pedidoEnCurso[key];
                 if (!it) return;
                 btn.textContent = 'Quitando…';
-                if (it.tarjetaId) {
+                if (it.tarjetaId && it.esCumple) {
+                    // Regalo de cumpleaños: se deshace la marca de "ya
+                    // usado este año" en vez de devolver un cupón.
+                    try {
+                        const ref = db.collection('mesaCuponera').doc(it.tarjetaId);
+                        const updates = { regaloCumpleAnioUsado: firebase.firestore.FieldValue.delete() };
+                        if (it.fusionadaConUid) {
+                            const batch = db.batch();
+                            batch.update(ref, updates);
+                            batch.update(clientesRef.doc(it.fusionadaConUid), updates);
+                            await batch.commit();
+                        } else {
+                            await ref.update(updates);
+                        }
+                    } catch (err) {
+                        console.error('Error deshaciendo el regalo de cumpleaños:', err);
+                        alert('No se pudo deshacer el regalo en la tarjeta, pero el platillo se quitó del pedido.');
+                    }
+                } else if (it.tarjetaId) {
                     try {
                         const ref = db.collection('mesaCuponera').doc(it.tarjetaId);
                         const doc = await ref.get();
@@ -1481,6 +1505,15 @@
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
+    // Compara solo mes y día de una fecha "YYYY-MM-DD" contra hoy (el
+    // año de nacimiento no importa para saber si hoy es su cumpleaños).
+    function esHoyElCumple(fechaNacimiento) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((fechaNacimiento || '').trim());
+        if (!m) return false;
+        const hoy = new Date();
+        return parseInt(m[2], 10) === (hoy.getMonth() + 1) && parseInt(m[3], 10) === hoy.getDate();
+    }
+
     let idCuponActual = null;
     let scannerCupon = null;
     let scannerCuponIniciado = false;
@@ -1496,6 +1529,7 @@
             document.getElementById('resultadoCupon').style.display = 'none';
             document.getElementById('errorCupon').style.display = 'none';
             document.getElementById('canjeCuponSection').style.display = 'none';
+            document.getElementById('cumpleCuponSection').style.display = 'none';
             document.getElementById('qrCreacionBox').style.display = 'none';
             document.getElementById('readerCupon').style.display = 'block';
             iniciarScannerCuponSiHaceFalta();
@@ -1682,6 +1716,7 @@
         document.getElementById('resultadoCupon').style.display = 'none';
         document.getElementById('errorCupon').style.display = 'none';
         document.getElementById('canjeCuponSection').style.display = 'none';
+            document.getElementById('cumpleCuponSection').style.display = 'none';
         document.getElementById('qrCreacionBox').style.display = 'none';
         document.getElementById('readerCupon').style.display = 'block';
         iniciarScannerCuponSiHaceFalta();
@@ -1740,6 +1775,41 @@
             tagGratis.textContent = gratis === 1 ? '1 platillo gratis disponible' : `${gratis} platillos gratis disponibles`;
         } else {
             tagGratis.style.display = 'none';
+        }
+
+        // Regalo de cumpleaños: se muestra el aviso siempre que hoy sea
+        // su cumpleaños (aunque ya se le haya dado, para que el mesero
+        // lo sepa), pero la lista para elegir platillo solo aparece si
+        // todavía no se le ha dado este año y venimos del menú de una mesa.
+        const anioActual = new Date().getFullYear();
+        const esCumple = esHoyElCumple(data.fechaNacimiento);
+        const yaUsadoCumple = data.regaloCumpleAnioUsado === anioActual;
+        const cuponCumpleTag = document.getElementById('cuponCumpleTag');
+        cuponCumpleTag.style.display = esCumple ? 'inline-block' : 'none';
+        cuponCumpleTag.textContent = esCumple
+            ? (yaUsadoCumple ? '🎂 Hoy es su cumpleaños (regalo ya entregado)' : '🎂 ¡Hoy es su cumpleaños!')
+            : '';
+
+        const seccionCumple = document.getElementById('cumpleCuponSection');
+        const listaCumpleCont = document.getElementById('listaCumple');
+        if (esCumple && !yaUsadoCumple && cuponOrigen === 'menu' && mesaActualNum) {
+            const cumpleables = menuItems.filter(it => it.redeemableBirthday);
+            if (cumpleables.length) {
+                seccionCumple.style.display = 'block';
+                listaCumpleCont.innerHTML = cumpleables.map(it =>
+                    `<button type="button" class="canjeable-btn" data-nombre="${it.name}">
+                        <img src="${getProductImage(it.name)}" alt="${it.name}">
+                        <span>🎂 ${it.name}</span>
+                    </button>`
+                ).join('');
+                listaCumpleCont.querySelectorAll('.canjeable-btn').forEach(btn => {
+                    btn.addEventListener('click', () => aplicarRegaloCumple(id, btn.dataset.nombre, data.fusionadaConUid || null));
+                });
+            } else {
+                seccionCumple.style.display = 'none';
+            }
+        } else {
+            seccionCumple.style.display = 'none';
         }
 
         // El canje solo tiene sentido si venimos del menú de una mesa
@@ -1813,6 +1883,51 @@
             alert('No se pudo aplicar el cupón. Intenta de nuevo.');
         } finally {
             listaCanjeablesCont.querySelectorAll('.canjeable-btn').forEach(b => b.disabled = false);
+        }
+    }
+
+    // Regalo de cumpleaños: a diferencia del cupón normal (que descuenta
+    // un contador), aquí se marca regaloCumpleAnioUsado con el año actual
+    // para que no se pueda volver a aplicar el mismo año, sin tocar
+    // freeDishesAvailable ni ordersCompleted.
+    async function aplicarRegaloCumple(tarjetaId, nombrePlatillo, fusionadaConUid) {
+        if (!mesaActualNum) return;
+        const listaCumpleCont = document.getElementById('listaCumple');
+        listaCumpleCont.querySelectorAll('.canjeable-btn').forEach(b => b.disabled = true);
+        try {
+            const anioActual = new Date().getFullYear();
+            const ref = db.collection('mesaCuponera').doc(tarjetaId);
+            const doc = await ref.get();
+            if (!doc.exists) { alert('La tarjeta ya no existe.'); return; }
+            const data = doc.data();
+            if (data.regaloCumpleAnioUsado === anioActual) {
+                alert('El regalo de cumpleaños de esta persona ya fue entregado este año.');
+                pintarResultadoCupon(tarjetaId, data);
+                return;
+            }
+            const updates = { regaloCumpleAnioUsado: anioActual };
+            if (fusionadaConUid) {
+                const batch = db.batch();
+                batch.update(ref, updates);
+                batch.update(clientesRef.doc(fusionadaConUid), updates);
+                await batch.commit();
+            } else {
+                await ref.update(updates);
+            }
+            sincronizarCacheCupon(tarjetaId, updates);
+
+            const key = 'CUMPLE::' + nombrePlatillo + '::' + Date.now();
+            pedidoEnCurso[key] = { name: nombrePlatillo, price: 0, qty: 1, gratis: true, esCumple: true, tarjetaId: tarjetaId, fusionadaConUid: fusionadaConUid || null };
+            renderMenuLista(filtroActual);
+            renderGratisAplicados();
+            actualizarBarraResumen();
+
+            mostrarPantalla('menuScreen');
+        } catch (err) {
+            console.error('Error aplicando el regalo de cumpleaños:', err);
+            alert('No se pudo aplicar el regalo. Intenta de nuevo.');
+        } finally {
+            listaCumpleCont.querySelectorAll('.canjeable-btn').forEach(b => b.disabled = false);
         }
     }
 

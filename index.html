@@ -3586,6 +3586,32 @@
         </div>
     </div>
 
+    <!-- MODAL: OFERTA DE REGALO DE CUMPLEAÑOS -->
+    <div class="addons-overlay" id="birthdayOfferOverlay">
+        <div class="addons-modal" style="text-align:center;">
+            <div style="font-size:42px; margin-bottom:6px;">🎂</div>
+            <h3>¡Feliz cumpleaños!</h3>
+            <p class="addons-subtitle">Hoy tienes un platillo de regalo. Puedes usarlo en este pedido o guardarlo para otro día.</p>
+            <div class="addons-actions">
+                <button class="addons-skip-btn" id="birthdayDeclineBtn">No, gracias</button>
+                <button class="addons-continue-btn" id="birthdayAcceptBtn"><i class="fas fa-gift"></i> Sí, quiero mi regalo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ELEGIR PLATILLO DE CUMPLEAÑOS -->
+    <div class="addons-overlay" id="birthdayPickOverlay">
+        <div class="addons-modal">
+            <h3>Elige tu platillo de regalo 🎂</h3>
+            <p class="addons-subtitle">Solo puedes elegir uno</p>
+            <div id="birthdayPickList"><!-- generado por JS --></div>
+            <div class="addons-actions">
+                <button class="addons-skip-btn" id="birthdayPickBackBtn">Cancelar</button>
+                <button class="addons-continue-btn" id="birthdayPickConfirmBtn"><i class="fas fa-check"></i> Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ADICIONALES ANTES DE FINALIZAR PEDIDO -->
     <div class="addons-overlay" id="addonsOverlay">
         <div class="addons-modal">
@@ -4333,6 +4359,7 @@
                         category: data.category,
                         desc: data.desc || '',
                         redeemable: !!data.redeemable,
+                        redeemableBirthday: !!data.redeemableBirthday,
                         comboItems: Array.isArray(data.comboItems) ? data.comboItems : []
                     });
                     if (data.imageSource === 'cloudinary' && data.imageValue) {
@@ -4950,7 +4977,7 @@
         let pendingCheckoutType = 'whatsapp'; // 'whatsapp' | 'digital'
 
         function continueCheckoutFlow() {
-            if (pendingCheckoutType === 'digital') maybeOfferCoupon();
+            if (pendingCheckoutType === 'digital') maybeOfferBirthday();
             else openAddonsModal();
         }
 
@@ -4973,7 +5000,104 @@
                 reopenOrderType();
                 return;
             }
+            maybeOfferBirthday();
+        });
+
+        // ============================================
+        // REGALO DE CUMPLEAÑOS (se ofrece antes que el cupón normal,
+        // solo a clientes logueados con Google cuya fecha de nacimiento
+        // coincide con hoy y que no hayan usado su regalo este año)
+        // ============================================
+        const birthdayOfferOverlay = document.getElementById('birthdayOfferOverlay');
+        const birthdayPickOverlay = document.getElementById('birthdayPickOverlay');
+        const birthdayPickList = document.getElementById('birthdayPickList');
+        let redeemedBirthdayItem = null; // { name } o null
+        let myBirthdayEligibleToday = false; // true si hoy es su cumpleaños y no ha usado el regalo este año
+
+        function esHoyElCumple(fechaNacimiento) {
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((fechaNacimiento || '').trim());
+            if (!m) return false;
+            const hoy = new Date();
+            return parseInt(m[2], 10) === (hoy.getMonth() + 1) && parseInt(m[3], 10) === hoy.getDate();
+        }
+
+        function maybeOfferBirthday() {
+            redeemedBirthdayItem = null;
+            const eligible = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myBirthdayEligibleToday;
+            if (eligible) {
+                birthdayOfferOverlay.classList.add('active');
+            } else {
+                maybeOfferCoupon();
+            }
+        }
+
+        document.getElementById('birthdayDeclineBtn').addEventListener('click', () => {
+            birthdayOfferOverlay.classList.remove('active');
+            redeemedBirthdayItem = null;
             maybeOfferCoupon();
+        });
+
+        document.getElementById('birthdayAcceptBtn').addEventListener('click', () => {
+            birthdayOfferOverlay.classList.remove('active');
+            openBirthdayPickModal();
+        });
+
+        birthdayOfferOverlay.addEventListener('click', (e) => {
+            if (e.target === birthdayOfferOverlay) {
+                birthdayOfferOverlay.classList.remove('active');
+                redeemedBirthdayItem = null;
+                maybeOfferCoupon();
+            }
+        });
+
+        function openBirthdayPickModal() {
+            const eligibleItems = menuItems.filter(i => i.redeemableBirthday);
+            if (eligibleItems.length === 0) {
+                alert('En este momento no hay platillos disponibles para tu regalo de cumpleaños. Vuelve a intentarlo más tarde.');
+                redeemedBirthdayItem = null;
+                maybeOfferCoupon();
+                return;
+            }
+            birthdayPickList.innerHTML = eligibleItems.map(item => `
+                <label class="coupon-pick-item">
+                    <input type="radio" name="birthdayPick" value="${item.name}">
+                    <img class="addon-item-img" src="${liveImageMap[item.name] || ''}" onerror="this.style.visibility='hidden'">
+                    <div class="addon-item-info">
+                        <div class="addon-item-name">${item.name}</div>
+                        <div class="addon-item-price">GRATIS</div>
+                    </div>
+                </label>
+            `).join('');
+            birthdayPickOverlay.classList.add('active');
+        }
+
+        function closeBirthdayPickModal() {
+            birthdayPickOverlay.classList.remove('active');
+        }
+
+        document.getElementById('birthdayPickBackBtn').addEventListener('click', () => {
+            closeBirthdayPickModal();
+            redeemedBirthdayItem = null;
+            maybeOfferCoupon();
+        });
+
+        document.getElementById('birthdayPickConfirmBtn').addEventListener('click', () => {
+            const checked = birthdayPickList.querySelector('input[name="birthdayPick"]:checked');
+            if (!checked) {
+                alert('Elige un platillo de la lista para continuar.');
+                return;
+            }
+            redeemedBirthdayItem = { name: checked.value };
+            closeBirthdayPickModal();
+            maybeOfferCoupon();
+        });
+
+        birthdayPickOverlay.addEventListener('click', (e) => {
+            if (e.target === birthdayPickOverlay) {
+                closeBirthdayPickModal();
+                redeemedBirthdayItem = null;
+                maybeOfferCoupon();
+            }
         });
 
         // ============================================
@@ -5115,6 +5239,9 @@
                 if (redeemedFreeItem) {
                     items.push({ name: redeemedFreeItem.name, qty: 1, price: 0, freeRedeemed: true });
                 }
+                if (redeemedBirthdayItem) {
+                    items.push({ name: redeemedBirthdayItem.name, qty: 1, price: 0, freeBirthdayRedeemed: true });
+                }
 
                 const cartSubtotal = cartSnapshot.reduce((sum, c) => sum + parsePrice(c.price) * c.qty, 0);
 
@@ -5136,23 +5263,37 @@
                     customerName: user.isAnonymous ? null : (user.displayName || null),
                     telefono: qrTelefono || null,
                     countsForLoyalty: !user.isAnonymous || !!qrTelefono,
-                    freeDishRedeemed: redeemedFreeItem ? redeemedFreeItem.name : null
+                    freeDishRedeemed: redeemedFreeItem ? redeemedFreeItem.name : null,
+                    freeBirthdayRedeemed: redeemedBirthdayItem ? redeemedBirthdayItem.name : null
                 };
 
                 const newOrderRef = db.collection('comandas').doc();
 
-                if (redeemedFreeItem && !user.isAnonymous) {
-                    // Transacción: solo se guarda el pedido si el cupón sigue
-                    // disponible en ese instante, y se descuenta a la vez
-                    // (evita que se use dos veces desde dos pestañas/dispositivos).
+                if ((redeemedFreeItem || redeemedBirthdayItem) && !user.isAnonymous) {
+                    // Transacción: solo se guarda el pedido si el cupón y/o el
+                    // regalo de cumpleaños siguen disponibles en ese instante,
+                    // y se descuentan/marcan a la vez (evita que se usen dos
+                    // veces desde dos pestañas/dispositivos).
+                    const anioActual = new Date().getFullYear();
                     await db.runTransaction(async (tx) => {
                         const clienteRef = db.collection('clientes').doc(user.uid);
                         const clienteDoc = await tx.get(clienteRef);
-                        const free = clienteDoc.exists ? (clienteDoc.data().freeDishesAvailable || 0) : 0;
-                        if (free < 1) {
-                            throw new Error('CUPON_NO_DISPONIBLE');
+                        const clienteData = clienteDoc.exists ? clienteDoc.data() : {};
+                        const updates = {};
+                        if (redeemedFreeItem) {
+                            const free = clienteData.freeDishesAvailable || 0;
+                            if (free < 1) {
+                                throw new Error('CUPON_NO_DISPONIBLE');
+                            }
+                            updates.freeDishesAvailable = free - 1;
                         }
-                        tx.set(clienteRef, { freeDishesAvailable: free - 1 }, { merge: true });
+                        if (redeemedBirthdayItem) {
+                            if (clienteData.regaloCumpleAnioUsado === anioActual) {
+                                throw new Error('CUMPLE_NO_DISPONIBLE');
+                            }
+                            updates.regaloCumpleAnioUsado = anioActual;
+                        }
+                        tx.set(clienteRef, updates, { merge: true });
                         tx.set(newOrderRef, orderData);
                     });
                 } else {
@@ -5162,6 +5303,7 @@
                 addonQuantities = {};
                 cart = [];
                 redeemedFreeItem = null;
+                redeemedBirthdayItem = null;
                 updateCartBadge();
                 closeCart();
                 // No hace falta "activar" nada más aquí: watchMyOrders() ya está
@@ -5173,6 +5315,9 @@
                 if (err.message === 'CUPON_NO_DISPONIBLE') {
                     alert('Tu cupón de platillo gratis ya no está disponible (puede que se haya usado en otro dispositivo). Vuelve a intentar enviar tu pedido.');
                     redeemedFreeItem = null;
+                } else if (err.message === 'CUMPLE_NO_DISPONIBLE') {
+                    alert('Tu regalo de cumpleaños ya fue usado este año (puede que se haya aplicado en otro dispositivo o con el mesero). Vuelve a intentar enviar tu pedido.');
+                    redeemedBirthdayItem = null;
                 } else {
                     alert('No se pudo enviar tu pedido. Intenta de nuevo o usa el botón de WhatsApp.');
                 }
@@ -5327,6 +5472,8 @@
                 const dishesHtml = (o.items || []).map(i =>
                     i.freeRedeemed
                         ? `<li class="free-dish">🎁 ${i.qty}x ${i.name} — Gratis</li>`
+                        : i.freeBirthdayRedeemed
+                        ? `<li class="free-dish">🎂 ${i.qty}x ${i.name} — Gratis</li>`
                         : `<li>${i.qty}x ${i.name} — ${formatPrice(i.price)}</li>`
                 ).join('') + (o.addons || []).map(a =>
                     `<li class="addon-dish">+ ${a.qty}x ${a.name} — ${formatPrice(a.price)}</li>`
@@ -5467,6 +5614,7 @@
                 const completed = data.ordersCompleted || 0;
                 const free = data.freeDishesAvailable || 0;
                 myFreeDishesAvailable = free;
+                myBirthdayEligibleToday = esHoyElCumple(data.fechaNacimiento) && data.regaloCumpleAnioUsado !== new Date().getFullYear();
                 const progressInCycle = completed % LOYALTY_THRESHOLD;
                 const pct = Math.round((progressInCycle / LOYALTY_THRESHOLD) * 100);
 
