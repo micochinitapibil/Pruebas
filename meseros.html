@@ -1473,6 +1473,14 @@
         if (doc.exists && doc.data().loyaltyThreshold) LOYALTY_THRESHOLD = doc.data().loyaltyThreshold;
     });
 
+    // Misma regla de "1 visita por día" que en comandas.html: se guarda la
+    // fecha (hora local) de la última visita contabilizada y, antes de
+    // sumar, se compara con la de hoy.
+    function hoyISO() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
     let idCuponActual = null;
     let scannerCupon = null;
     let scannerCuponIniciado = false;
@@ -1817,9 +1825,19 @@
             const ref = db.collection('mesaCuponera').doc(idCuponActual);
             const doc = await ref.get();
             const data = doc.data();
+
+            // 1 visita por día: si esta tarjeta (o la cuenta a la que está
+            // fusionada) ya registró una visita hoy, no se suma otra.
+            const hoy = hoyISO();
+            if (data.ultimaVisitaDia === hoy) {
+                btn.textContent = 'Ya se registró hoy';
+                setTimeout(reanudarScannerCupon, 900);
+                return;
+            }
+
             const newCount = (data.ordersCompleted || 0) + 1;
             const currentFree = data.freeDishesAvailable || 0;
-            const updates = { ordersCompleted: newCount };
+            const updates = { ordersCompleted: newCount, ultimaVisitaDia: hoy };
             // Los cupones no son acumulables: si ya tiene uno sin usar, al
             // llegar al umbral no se le suma otro (igual que en la
             // cuponera de clientes registrados).

@@ -420,6 +420,17 @@
         }
     }, err => console.error('Error leyendo configuración:', err));
 
+    // Regla de "1 visita por día": aunque el cliente pida varios platillos
+    // por separado en el mismo día, solo cuenta como UNA visita (si no,
+    // podría llegar a las 7 visitas en un solo día pidiendo 7 platillos
+    // sueltos). Se guarda la fecha (hora local) de la última visita
+    // contabilizada en el propio documento (clientes/{uid} o
+    // mesaCuponera/{telefono}) y, antes de sumar, se compara con hoy.
+    function hoyISO() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
     // ==================================================
     // LOGIN / LOGOUT (igual que admin.html)
     // ==================================================
@@ -614,8 +625,14 @@
                 showToast('Actualizado a "' + STATUS_LABELS[nextStatus] + '"');
                 if (nextStatus === 'entregado') {
                     const order = allOrders.find(o => o.id === id);
-                    if (order && order.countsForLoyalty && order.uid) {
-                        grantLoyaltyCredit(order.uid);
+                    if (order && order.countsForLoyalty) {
+                        if (order.telefono) {
+                            // Pedido de un invitado sin cuenta de Google que
+                            // ya tiene su código QR (mesaCuponera/{telefono}).
+                            grantLoyaltyCreditQr(order.telefono);
+                        } else if (order.uid) {
+                            grantLoyaltyCredit(order.uid);
+                        }
                     }
                 }
             })
@@ -637,11 +654,18 @@
         db.runTransaction(async (tx) => {
             const doc = await tx.get(clienteRef);
             const data = doc.exists ? doc.data() : { ordersCompleted: 0, freeDishesAvailable: 0 };
+
+            // Ya se contó una visita hoy: no se suma otra aunque este sea
+            // otro pedido distinto (varios pedidos el mismo día = 1 sola visita).
+            const hoy = hoyISO();
+            if (data.ultimaVisitaDia === hoy) return;
+
             const newCount = (data.ordersCompleted || 0) + 1;
             const currentFree = data.freeDishesAvailable || 0;
             let newFree = currentFree;
             const updates = {
                 ordersCompleted: newCount,
+                ultimaVisitaDia: hoy,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             if (newCount % LOYALTY_THRESHOLD === 0 && currentFree < 1) {
@@ -660,9 +684,45 @@
 
             tx.set(clienteRef, updates, { merge: true });
             if (tarjetaRef) {
-                tx.set(tarjetaRef, { ordersCompleted: newCount, freeDishesAvailable: newFree }, { merge: true });
+                tx.set(tarjetaRef, { ordersCompleted: newCount, freeDishesAvailable: newFree, ultimaVisitaDia: hoy }, { merge: true });
             }
         }).catch(err => console.error('Error actualizando cuponera:', err));
+    }
+
+    // Igual que grantLoyaltyCredit, pero para un pedido hecho por un
+    // invitado SIN cuenta de Google que participa con su código QR
+    // (mesaCuponera/{telefono}). En ese caso no existe clientes/{uid}:
+    // mesaCuponera/{telefono} ES la fuente real y se abona directamente ahí.
+    //
+    // Si la tarjeta ya se fusionó con una cuenta de Google
+    // (fusionadaConUid), la fuente real pasó a ser clientes/{uid}, así que
+    // se abona ahí con grantLoyaltyCredit (que además refleja el resultado
+    // de vuelta en esta misma tarjeta).
+    function grantLoyaltyCreditQr(telefono) {
+        const tarjetaRef = db.collection('mesaCuponera').doc(telefono);
+        db.runTransaction(async (tx) => {
+            const doc = await tx.get(tarjetaRef);
+            if (!doc.exists) return; // la tarjeta ya no existe, no hay a quién abonar
+            const data = doc.data();
+            if (data.fusionadaConUid) {
+                return { redirectUid: data.fusionadaConUid };
+            }
+
+            // Misma regla de 1 visita por día que en grantLoyaltyCredit.
+            const hoy = hoyISO();
+            if (data.ultimaVisitaDia === hoy) return null;
+
+            const newCount = (data.ordersCompleted || 0) + 1;
+            const currentFree = data.freeDishesAvailable || 0;
+            const updates = { ordersCompleted: newCount, ultimaVisitaDia: hoy };
+            if (newCount % LOYALTY_THRESHOLD === 0 && currentFree < 1) {
+                updates.freeDishesAvailable = currentFree + 1;
+            }
+            tx.set(tarjetaRef, updates, { merge: true });
+            return null;
+        }).then(result => {
+            if (result && result.redirectUid) grantLoyaltyCredit(result.redirectUid);
+        }).catch(err => console.error('Error actualizando cuponera (QR):', err));
     }
 
     document.getElementById('tabActive').addEventListener('click', () => {

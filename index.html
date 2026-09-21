@@ -5104,6 +5104,13 @@
                 const fee = getDeliveryFee();
                 const user = auth.currentUser;
 
+                // Si es un invitado (sin cuenta de Google) pero ya se creó o
+                // recuperó su código QR de cuponera (mesaQrTarjetaId en
+                // localStorage), este pedido también debe contar para su
+                // tarjeta mesaCuponera/{telefono} — antes solo se contaba a
+                // quien iniciaba sesión con Google.
+                const qrTelefono = user.isAnonymous ? localStorage.getItem(LOYALTY_QR_LS_KEY) : null;
+
                 const items = cartSnapshot.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) }));
                 if (redeemedFreeItem) {
                     items.push({ name: redeemedFreeItem.name, qty: 1, price: 0, freeRedeemed: true });
@@ -5127,7 +5134,8 @@
                     uid: user.uid,
                     customerEmail: user.isAnonymous ? null : user.email,
                     customerName: user.isAnonymous ? null : (user.displayName || null),
-                    countsForLoyalty: !user.isAnonymous,
+                    telefono: qrTelefono || null,
+                    countsForLoyalty: !user.isAnonymous || !!qrTelefono,
                     freeDishRedeemed: redeemedFreeItem ? redeemedFreeItem.name : null
                 };
 
