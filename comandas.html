@@ -557,7 +557,9 @@
         container.innerHTML = list.map((o, idx) => {
             const itemsHtml = (o.items || []).map(i => {
                 if (i.divider) return `<li class="items-divider">🕑 ${i.label || 'Agregó nuevos platillos'}</li>`;
-                return (i.freeRedeemed || i.gratis)
+                return (i.freeBirthdayRedeemed || i.esCumple)
+                    ? `<li style="color: var(--green); font-weight:700;">🎂 ${i.qty}x ${i.name} — GRATIS (cumpleaños)</li>`
+                    : (i.freeRedeemed || i.gratis)
                     ? `<li style="color: var(--green); font-weight:700;">🎁 ${i.qty}x ${i.name} — GRATIS (cupón)</li>`
                     : `<li>${i.qty}x ${i.name} — ${formatMoney(i.price)}</li>`;
             }).join('');
