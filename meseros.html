@@ -720,21 +720,33 @@
     // piden que quien los crea esté autenticado y sea dueño del uid del
     // documento — igual que hace index.html con sus clientes invitados.
     // No requiere ningún cambio en las reglas de Firestore.)
+    //
+    // IMPORTANTE: se fuerza persistencia "SESSION" (aislada a esta
+    // pestaña) para que esta sesión anónima nunca se mezcle con la
+    // sesión de Google que se usa en admin.html/comandas.html cuando
+    // se abren en el mismo navegador/perfil — de lo contrario, iniciar
+    // sesión con Google en otra pestaña del mismo origen puede
+    // reemplazar silenciosamente esta sesión anónima a medio uso y
+    // provocar "Missing or insufficient permissions" al guardar.
     // ==================================================
     let meseroUid = null;
     let authListo = null;
     function esperarAuth() {
         if (!authListo) {
             authListo = new Promise((resolve) => {
-                const unsub = auth.onAuthStateChanged(user => {
+                auth.onAuthStateChanged(user => {
+                    // Sin unsubscribe: si la sesión cambia más adelante
+                    // (por ejemplo por algo en otra pestaña), meseroUid
+                    // se mantiene siempre igual al usuario real vigente.
                     if (user) {
                         meseroUid = user.uid;
-                        unsub();
                         resolve(user.uid);
                     }
                 });
             });
-            auth.signInAnonymously().catch(err => console.error('Error de autenticación anónima:', err));
+            auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+                .then(() => auth.signInAnonymously())
+                .catch(err => console.error('Error de autenticación anónima:', err));
         }
         return authListo;
     }
@@ -1419,7 +1431,7 @@
                     items: nuevosItems,
                     subtotal: totalTally,
                     total: totalTally,
-                    uid: meseroUid,
+                    uid: (auth.currentUser && auth.currentUser.uid) || meseroUid,
                     meseroName: meseroActivo,
                     customerEmail: null,
                     countsForLoyalty: false
