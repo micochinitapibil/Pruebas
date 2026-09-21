@@ -709,9 +709,16 @@
         messagingSenderId: "329969528973",
         appId: "1:329969528973:web:d7c60b4243f1ce5c9432c4"
     };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    // App de Firebase con NOMBRE PROPIO (no la "[DEFAULT]"): así su sesión
+    // de autenticación vive en un espacio de almacenamiento totalmente
+    // aparte del que usan index.html/admin.html/comandas.html. Esto evita
+    // que, si el mismo navegador/pestaña se usa para meseros.html y luego
+    // se navega a index.html (o a la inversa), uno "herede" por accidente
+    // la sesión anónima del otro — antes sí pasaba porque ambos usaban la
+    // app "[DEFAULT]" de Firebase, que comparte la misma sesión.
+    const meseroApp = firebase.initializeApp(firebaseConfig, 'MeserosApp');
+    const auth = meseroApp.auth();
+    const db = meseroApp.firestore();
     const clientesRef = db.collection('clientes');
 
     // ==================================================
