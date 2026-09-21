@@ -2556,7 +2556,7 @@
         }
 
         /* ============================================
-           TIPO DE PEDIDO (domicilio / recoger / comer aquí)
+           TIPO DE PEDIDO (domicilio / recoger)
            ============================================ */
         .order-type-overlay {
             position: fixed;
@@ -2668,36 +2668,6 @@
             color: #8a7554;
             font-weight: 500;
             margin-top: 2px;
-        }
-
-        .table-select[hidden] {
-            display: none;
-        }
-
-        .table-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin-bottom: 18px;
-        }
-
-        .table-grid button {
-            aspect-ratio: 1;
-            border: 2px solid rgba(138, 97, 22, 0.25);
-            background: white;
-            border-radius: 12px;
-            font-family: inherit;
-            font-size: 16px;
-            font-weight: 800;
-            color: var(--dark);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .table-grid button:hover {
-            border-color: var(--primary);
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
         }
 
         .table-back-btn {
@@ -3016,12 +2986,6 @@
             align-items: center;
             gap: 4px;
         }
-
-        @media (max-width: 480px) {
-            .table-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
     </style>
     <!-- Firebase (CDN, compat SDK - vanilla JS, sin npm) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -3029,7 +2993,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 </head>
 <body>
-    <!-- TIPO DE PEDIDO (domicilio / recoger / comer aquí) -->
+    <!-- TIPO DE PEDIDO (domicilio / recoger) -->
     <div class="order-type-overlay" id="orderTypeOverlay" hidden>
         <div class="order-type-card">
             <button type="button" class="order-type-close" id="orderTypeCloseBtn" aria-label="Cerrar">&times;</button>
@@ -3047,20 +3011,7 @@
                     <span>Recoger en el local</span>
                     <small>Sin costo extra</small>
                 </button>
-                <button type="button" class="order-type-btn" data-type="dine_in">
-                    <i class="fas fa-utensils"></i>
-                    <span>Comer aquí</span>
-                    <small>Elige tu mesa</small>
-                </button>
                 <button type="button" class="table-back-btn" id="orderTypeBackBtn">
-                    <i class="fas fa-arrow-left"></i> Regresar
-                </button>
-            </div>
-
-            <div class="table-select" id="tableSelect" hidden>
-                <div class="order-type-subtitle">¿En qué mesa estás?</div>
-                <div class="table-grid" id="tableGrid"><!-- generado por JS --></div>
-                <button type="button" class="table-back-btn" id="tableBackBtn">
                     <i class="fas fa-arrow-left"></i> Regresar
                 </button>
             </div>
@@ -3815,8 +3766,8 @@
             } else {
                 // Nadie ha iniciado sesión todavía: en vez de forzar una pantalla
                 // de login, entramos como invitado automáticamente y lo dejamos
-                // navegar el menú libremente. La pregunta de a domicilio/mesa/
-                // recoger ya no se hace aquí: se pregunta hasta que abra el
+                // navegar el menú libremente. La pregunta de a domicilio/recoger
+                // ya no se hace aquí: se pregunta hasta que abra el
                 // carrito con productos adentro (ver cartBtn más abajo).
                 if (lastSessionKey !== undefined && lastSessionKey !== null) resetSessionState();
                 lastSessionKey = null;
@@ -3828,21 +3779,15 @@
         });
 
         // ============================================
-        // TIPO DE PEDIDO (domicilio / recoger / comer aquí)
+        // TIPO DE PEDIDO (domicilio / recoger)
         // ============================================
-        let TABLE_COUNT = 10; // valor de respaldo mientras carga la configuración real
-
-        let orderType = null;       // 'delivery' | 'pickup' | 'dine_in'
-        let tableNumber = null;     // solo si orderType === 'dine_in'
+        let orderType = null;       // 'delivery' | 'pickup'
         let pendingOrderTypeThenCheckout = false; // true cuando la pregunta se disparó desde "Finalizar pedido", para retomar el checkout justo después de elegir
 
         const orderTypeOverlay = document.getElementById('orderTypeOverlay');
         const orderTypeOptions = document.getElementById('orderTypeOptions');
         const orderTypeCloseBtn = document.getElementById('orderTypeCloseBtn');
         const orderTypeBackBtn = document.getElementById('orderTypeBackBtn');
-        const tableSelect = document.getElementById('tableSelect');
-        const tableGrid = document.getElementById('tableGrid');
-        const tableBackBtn = document.getElementById('tableBackBtn');
         const serviceBar = document.getElementById('serviceBar');
         const serviceBarIcon = document.getElementById('serviceBarIcon');
         const serviceBarText = document.getElementById('serviceBarText');
@@ -3850,34 +3795,13 @@
         const cartServiceSummaryText = document.getElementById('cartServiceSummaryText');
         const cartServiceSummaryChange = document.getElementById('cartServiceSummaryChange');
 
-        // Genera los botones de mesa (1 a TABLE_COUNT). Se puede volver a llamar
-        // si la configuración real llega después de la primera pintada.
-        function renderTableGrid(count) {
-            TABLE_COUNT = count;
-            tableGrid.innerHTML = '';
-            for (let i = 1; i <= TABLE_COUNT; i++) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = i;
-                btn.addEventListener('click', () => {
-                    tableNumber = i;
-                    finishOrderTypeSelection('dine_in');
-                });
-                tableGrid.appendChild(btn);
-            }
-        }
-        renderTableGrid(TABLE_COUNT);
-
         let LOYALTY_THRESHOLD = 7; // valor de respaldo mientras carga la configuración real
         let myFreeDishesAvailable = 0; // cupones sin usar del cliente logueado actual
 
-        // Escucha la config del negocio en tiempo real (mesas y umbral de cuponera),
+        // Escucha la config del negocio en tiempo real (umbral de cuponera),
         // así si el admin la cambia no hace falta ni recargar la página.
         configRef.onSnapshot(doc => {
             const data = doc.exists ? doc.data() : {};
-            if (data.tableCount && data.tableCount !== TABLE_COUNT) {
-                renderTableGrid(data.tableCount);
-            }
             if (data.loyaltyThreshold) {
                 LOYALTY_THRESHOLD = data.loyaltyThreshold;
                 updateLoyaltyThresholdUI();
@@ -3886,7 +3810,6 @@
 
         function reopenOrderType() {
             orderTypeOptions.hidden = false;
-            tableSelect.hidden = true;
             deliveryLocationOverlay.setAttribute('hidden', '');
             orderTypeOverlay.removeAttribute('hidden');
         }
@@ -3894,10 +3817,7 @@
         document.querySelectorAll('.order-type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const type = btn.dataset.type;
-                if (type === 'dine_in') {
-                    orderTypeOptions.hidden = true;
-                    tableSelect.hidden = false;
-                } else if (type === 'delivery') {
+                if (type === 'delivery') {
                     orderTypeOverlay.setAttribute('hidden', '');
                     deliveryLocationOverlay.removeAttribute('hidden');
                     openDeliveryLocationStep();
@@ -3905,11 +3825,6 @@
                     finishOrderTypeSelection(type);
                 }
             });
-        });
-
-        tableBackBtn.addEventListener('click', () => {
-            orderTypeOptions.hidden = false;
-            tableSelect.hidden = true;
         });
 
         deliveryBackBtn.addEventListener('click', () => {
@@ -4122,7 +4037,6 @@
 
         function orderTypeLabel() {
             if (orderType === 'delivery') return { icon: 'fa-motorcycle', text: 'A domicilio' };
-            if (orderType === 'dine_in') return { icon: 'fa-utensils', text: `Comer aquí — Mesa ${tableNumber}` };
             return { icon: 'fa-store', text: 'Recoger en el local' };
         }
 
@@ -4989,8 +4903,6 @@
             const fee = getDeliveryFee();
             if (orderType === 'delivery') {
                 message += '\n🛵 Servicio: A domicilio';
-            } else if (orderType === 'dine_in') {
-                message += `\n🍽️ Servicio: Comer aquí — Mesa ${tableNumber}`;
             } else {
                 message += '\n🏠 Servicio: Recoger en el local';
             }
@@ -5193,7 +5105,7 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'nuevo',
                     orderType: orderType,
-                    tableNumber: orderType === 'dine_in' ? tableNumber : null,
+                    tableNumber: null,
                     items: items,
                     addons: addonsData,
                     subtotal: cartSubtotal,
@@ -5392,9 +5304,7 @@
                     return `<span class="seg ${cls}"></span>`;
                 }).join('');
 
-                const service = o.orderType === 'dine_in'
-                    ? 'Mesa ' + (o.tableNumber ?? '—')
-                    : (ORDER_TYPE_LABEL[o.orderType] || '');
+                const service = ORDER_TYPE_LABEL[o.orderType] || '';
 
                 const dishesHtml = (o.items || []).map(i =>
                     i.freeRedeemed
@@ -5494,7 +5404,6 @@
         // no se herede al siguiente que use el mismo dispositivo sin recargar.
         function resetSessionState() {
             orderType = null;
-            tableNumber = null;
             pendingOrderTypeThenCheckout = false;
             cart = [];
             if (typeof updateCartBadge === 'function') updateCartBadge();
