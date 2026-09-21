@@ -1250,8 +1250,8 @@
         }
 
         .combo-suggest-icon {
-            width: 60px;
-            height: 60px;
+            width: 96px;
+            height: 96px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
@@ -1260,6 +1260,13 @@
             align-items: center;
             justify-content: center;
             margin: 0 auto 16px;
+            overflow: hidden;
+        }
+
+        .combo-suggest-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         .combo-suggest-title {
@@ -3386,7 +3393,7 @@
     <!-- SUGERENCIA AUTOMÁTICA DE COCHICOMBO -->
     <div class="combo-suggest-overlay" id="comboSuggestOverlay">
         <div class="combo-suggest-modal">
-            <div class="combo-suggest-icon"><i class="fas fa-gift"></i></div>
+            <div class="combo-suggest-icon" id="comboSuggestIconWrap"><i class="fas fa-gift"></i></div>
             <div class="combo-suggest-title" id="comboSuggestTitle">¡Arma tu CochiCombo!</div>
             <p class="combo-suggest-text" id="comboSuggestText"></p>
             <p class="combo-suggest-savings" id="comboSuggestSavings"></p>
@@ -4640,6 +4647,9 @@
             pendingCombo = combo;
             const piezas = combo.comboItems.map(describeComboRequirement).join(' + ');
             comboSuggestText.textContent = `Tu pedido ya trae ${piezas}, justo lo que lleva el combo "${combo.name}".`;
+
+            const iconWrap = document.getElementById('comboSuggestIconWrap');
+            iconWrap.innerHTML = `<img src="${getProductImage(combo.name)}" alt="${combo.name}" onerror="this.parentElement.innerHTML='<i class=&quot;fas fa-gift&quot;></i>'">`;
 
             const comboPrice = parsePrice(combo.price);
             const piecesPrice = combo.comboItems.reduce((sum, req) => {

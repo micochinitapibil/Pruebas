@@ -687,7 +687,7 @@
 <!-- ===== SUGERENCIA AUTOMÁTICA DE COCHICOMBO ===== -->
 <div class="overlay" id="comboSuggestOverlay" hidden>
     <div class="hoja" style="text-align:center;">
-        <div style="font-size:38px;margin-bottom:6px;">🎁</div>
+        <div id="comboSuggestIconWrap" style="width:96px;height:96px;border-radius:50%;margin:0 auto 10px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);font-size:38px;">🎁</div>
         <h2 id="comboSuggestTitulo">¡Arma un CochiCombo!</h2>
         <p id="comboSuggestTexto" style="font-size:14px;color:#666;line-height:1.5;margin:10px 0 6px;text-align:left;"></p>
         <p id="comboSuggestAhorro" style="font-size:14px;font-weight:800;color:#2f7a56;margin-bottom:18px;"></p>
@@ -1204,6 +1204,9 @@
         pendingCombo = combo;
         const piezas = combo.comboItems.map(describeComboRequirement).join(' + ');
         comboSuggestTexto.textContent = `Este pedido ya trae ${piezas}, justo lo que lleva el combo "${combo.name}".`;
+
+        const iconWrap = document.getElementById('comboSuggestIconWrap');
+        iconWrap.innerHTML = `<img src="${getProductImage(combo.name)}" alt="${combo.name}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='🎁'">`;
 
         const piezasArray = pedidoPagadoArray();
         const piecesPrice = combo.comboItems.reduce((sum, req) => {
