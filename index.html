@@ -2321,6 +2321,18 @@
 
         .loyalty-free-banner[hidden] { display: none; }
 
+        .loyalty-birthday-banner {
+            margin-top: 14px;
+            background: #ffe3ec;
+            border: 2px dashed #c2185b;
+            border-radius: 14px;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #c2185b;
+        }
+        .loyalty-birthday-banner[hidden] { display: none; }
+
         /* ============================================
            LOGIN DE CLIENTES
            ============================================ */
@@ -3588,6 +3600,7 @@
                     <div class="loyalty-progress-bar"><div class="loyalty-progress-fill" id="loyaltyQrProgressFill" style="width:0%;"></div></div>
                     <div class="loyalty-progress-text" id="loyaltyQrProgressText"></div>
                     <div class="loyalty-free-banner" id="loyaltyQrFreeBanner" hidden></div>
+                    <div class="loyalty-birthday-banner" id="loyaltyQrBirthdayBanner" hidden>🎂 ¡Hoy es tu cumpleaños! Puedes pedir tu regalo al finalizar tu pedido, o mostrarle este código al mesero.</div>
 
                     <div class="loyalty-qr-nota">Muéstrale este código al mesero para registrar tu visita o canjear tu platillo gratis.</div>
                     <button type="button" class="loyalty-qr-back" id="loyaltyQrReiniciarBtn" style="margin:0;">No soy yo — crear otro código</button>
@@ -5083,6 +5096,7 @@
         const birthdayPickList = document.getElementById('birthdayPickList');
         let redeemedBirthdayItem = null; // { name } o null
         let myBirthdayEligibleToday = false; // true si hoy es su cumpleaños y no ha usado el regalo este año
+        let myGuestBirthdayEligibleToday = false; // igual que arriba, pero para un invitado con tarjeta QR (identificado por su teléfono, no por cuenta de Google)
 
         function esHoyElCumple(fechaNacimiento) {
             const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((fechaNacimiento || '').trim());
@@ -5093,7 +5107,14 @@
 
         function maybeOfferBirthday() {
             redeemedBirthdayItem = null;
-            const eligible = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myBirthdayEligibleToday;
+            // Elegible por cuenta de Google, o elegible como invitado con
+            // tarjeta QR (la variable primaria ahí es el teléfono guardado
+            // en localStorage, igual que en el resto del sistema de
+            // cuponera para invitados).
+            const eligibleCuenta = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myBirthdayEligibleToday;
+            const eligibleInvitado = isGuest && auth.currentUser && auth.currentUser.isAnonymous
+                && !!localStorage.getItem(LOYALTY_QR_LS_KEY) && myGuestBirthdayEligibleToday;
+            const eligible = eligibleCuenta || eligibleInvitado;
             if (eligible) {
                 birthdayOfferOverlay.classList.add('active');
             } else {
@@ -5364,6 +5385,23 @@
                             updates.regaloCumpleAnioUsado = anioActual;
                         }
                         tx.set(clienteRef, updates, { merge: true });
+                        tx.set(newOrderRef, orderData);
+                    });
+                } else if (redeemedBirthdayItem && user.isAnonymous && qrTelefono) {
+                    // Invitado sin cuenta de Google, pero con tarjeta QR: la
+                    // variable primaria aquí es el teléfono (mesaCuponera/{telefono}),
+                    // así que el regalo de cumpleaños se marca ahí mismo —
+                    // igual que si lo canjeara el mesero desde meseros.html —
+                    // en vez de en clientes/{uid}, que para un invitado no existe.
+                    const anioActual = new Date().getFullYear();
+                    const tarjetaRef = db.collection('mesaCuponera').doc(qrTelefono);
+                    await db.runTransaction(async (tx) => {
+                        const tarjetaDoc = await tx.get(tarjetaRef);
+                        const tarjetaData = tarjetaDoc.exists ? tarjetaDoc.data() : {};
+                        if (tarjetaData.regaloCumpleAnioUsado === anioActual) {
+                            throw new Error('CUMPLE_NO_DISPONIBLE');
+                        }
+                        tx.set(tarjetaRef, { regaloCumpleAnioUsado: anioActual }, { merge: true });
                         tx.set(newOrderRef, orderData);
                     });
                 } else {
@@ -5657,6 +5695,7 @@
         function showLoyaltyGuestView() {
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
             myFreeDishesAvailable = 0;
+            myGuestBirthdayEligibleToday = false;
             miTelefonoActual = null;
             loyaltyUserView.hidden = true;
             document.getElementById('miQrBox').hidden = true;
@@ -5943,6 +5982,7 @@
             if (loyaltyQrUnsub) { loyaltyQrUnsub(); loyaltyQrUnsub = null; }
             loyaltyQrPasoTarjeta.hidden = true;
             loyaltyQrPasoNombre.hidden = false;
+            myGuestBirthdayEligibleToday = false;
         }
 
         function loyaltyQrPintarTarjeta(id, data) {
@@ -5968,6 +6008,13 @@
             } else {
                 banner.hidden = true;
             }
+
+            // Igual que myBirthdayEligibleToday para cuentas de Google, pero
+            // usando la tarjeta mesaCuponera/{telefono} del invitado: así el
+            // regalo de cumpleaños también se puede pedir desde aquí y no
+            // solo con el mesero o con cuenta de Google.
+            myGuestBirthdayEligibleToday = esHoyElCumple(data.fechaNacimiento) && data.regaloCumpleAnioUsado !== new Date().getFullYear();
+            document.getElementById('loyaltyQrBirthdayBanner').hidden = !myGuestBirthdayEligibleToday;
         }
 
         function loyaltyQrEscucharTarjeta(id) {
