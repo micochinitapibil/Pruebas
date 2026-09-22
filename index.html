@@ -2447,6 +2447,64 @@
             margin: -6px 0 14px;
             text-align: left;
         }
+        /* --- Selector elegante de fecha de nacimiento (día/mes/año) ---
+           Reemplaza el <input type="date"> nativo: en varios navegadores
+           de Android (Brave/Chrome) ese input se veía completamente en
+           blanco, sin ningún texto ni placeholder, y su calendario nativo
+           no combinaba con el estilo dorado del sitio. */
+        .dob-label {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--secondary);
+            text-align: left;
+            margin: 2px 0 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dob-label i { font-size: 12px; color: var(--primary); }
+        .dob-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .dob-select-wrap {
+            position: relative;
+            min-width: 0;
+        }
+        .dob-select-wrap:nth-child(1) { flex: 0.8; }
+        .dob-select-wrap:nth-child(2) { flex: 1.25; }
+        .dob-select-wrap:nth-child(3) { flex: 1.05; }
+        .dob-select {
+            width: 100%;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 12px 22px 12px 10px;
+            font-family: inherit;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--accent);
+            background: #fffdf7;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease;
+        }
+        .dob-select:focus { outline: none; border-color: var(--secondary); }
+        .dob-select-wrap::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 10px;
+            color: var(--secondary);
+            position: absolute;
+            right: 9px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
         .loyalty-qr-box {
             background: white;
             border-radius: 16px;
@@ -3486,7 +3544,13 @@
                 <input type="tel" id="loyaltyPhoneInput" placeholder="Número de celular (10 dígitos)" maxlength="10" inputmode="numeric" autocomplete="off">
                 <div class="loyalty-phone-error" id="loyaltyPhoneError"></div>
                 <input type="text" id="loyaltyPhoneNombreInput" placeholder="Nombre (opcional)" maxlength="40" autocomplete="off">
-                <input type="date" id="loyaltyPhoneFechaInput">
+                <div class="dob-label"><i class="fas fa-cake-candles"></i> Fecha de nacimiento (opcional)</div>
+                <div class="dob-group" id="loyaltyPhoneFechaGroup">
+                    <div class="dob-select-wrap"><select class="dob-select" data-dob-part="day" aria-label="Día de nacimiento"></select></div>
+                    <div class="dob-select-wrap"><select class="dob-select" data-dob-part="month" aria-label="Mes de nacimiento"></select></div>
+                    <div class="dob-select-wrap"><select class="dob-select" data-dob-part="year" aria-label="Año de nacimiento"></select></div>
+                </div>
+                <input type="hidden" id="loyaltyPhoneFechaInput">
                 <div class="loyalty-phone-hint">Nombre y fecha de nacimiento son opcionales</div>
                 <button type="button" class="google-btn" id="loyaltyPhoneGuardarBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Guardar</button>
             </div>
@@ -3504,7 +3568,13 @@
                     <input type="tel" id="loyaltyQrInputTelefono" placeholder="Número de celular (10 dígitos)" maxlength="10" inputmode="numeric" autocomplete="off">
                     <div class="loyalty-phone-error" id="loyaltyQrTelefonoError" style="display:none;"></div>
                     <input type="text" id="loyaltyQrInputNombre" placeholder="Nombre (opcional)" maxlength="30">
-                    <input type="date" id="loyaltyQrInputFecha">
+                    <div class="dob-label"><i class="fas fa-cake-candles"></i> Fecha de nacimiento (opcional)</div>
+                    <div class="dob-group" id="loyaltyQrFechaGroup">
+                        <div class="dob-select-wrap"><select class="dob-select" data-dob-part="day" aria-label="Día de nacimiento"></select></div>
+                        <div class="dob-select-wrap"><select class="dob-select" data-dob-part="month" aria-label="Mes de nacimiento"></select></div>
+                        <div class="dob-select-wrap"><select class="dob-select" data-dob-part="year" aria-label="Año de nacimiento"></select></div>
+                    </div>
+                    <input type="hidden" id="loyaltyQrInputFecha">
                     <div class="loyalty-phone-hint">Nombre y fecha de nacimiento son opcionales</div>
                     <button type="button" class="google-btn" id="loyaltyQrCrearBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Crear mi código</button>
                 </div>
@@ -5653,6 +5723,75 @@
         // (nombre y fecha de nacimiento opcionales) + FUSIÓN con una
         // tarjeta de QR (mesaCuponera) que ya tenga ese mismo número.
         // ============================================
+        // ============================================
+        // SELECTOR DE FECHA DE NACIMIENTO (día/mes/año)
+        // Sustituye al <input type="date"> nativo. Mantiene un
+        // <input type="hidden"> con el mismo id de siempre y en el
+        // mismo formato "YYYY-MM-DD" que ya usaba el resto del código,
+        // para no tener que tocar nada más de la lógica de guardado.
+        // ============================================
+        const MESES_CORTOS_DOB = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+        function diasEnMesDob(mes, anio) {
+            if (!mes) return 31;
+            return new Date(anio || 2000, mes, 0).getDate();
+        }
+
+        function initDobGroup(groupId, hiddenId) {
+            const group = document.getElementById(groupId);
+            const hidden = document.getElementById(hiddenId);
+            const selDia = group.querySelector('[data-dob-part="day"]');
+            const selMes = group.querySelector('[data-dob-part="month"]');
+            const selAnio = group.querySelector('[data-dob-part="year"]');
+
+            selMes.innerHTML = '<option value="">Mes</option>' +
+                MESES_CORTOS_DOB.map((m, i) => `<option value="${String(i + 1).padStart(2, '0')}">${m}</option>`).join('');
+
+            const anioActual = new Date().getFullYear();
+            let opcionesAnio = '<option value="">Año</option>';
+            for (let a = anioActual; a >= anioActual - 99; a--) {
+                opcionesAnio += `<option value="${a}">${a}</option>`;
+            }
+            selAnio.innerHTML = opcionesAnio;
+
+            function pintarDias() {
+                const mes = parseInt(selMes.value, 10) || 0;
+                const anio = parseInt(selAnio.value, 10) || 0;
+                const totalDias = diasEnMesDob(mes, anio);
+                const diaActual = parseInt(selDia.value, 10) || 0;
+                let opciones = '<option value="">Día</option>';
+                for (let d = 1; d <= totalDias; d++) {
+                    opciones += `<option value="${String(d).padStart(2, '0')}">${d}</option>`;
+                }
+                selDia.innerHTML = opciones;
+                if (diaActual && diaActual <= totalDias) selDia.value = String(diaActual).padStart(2, '0');
+            }
+            pintarDias();
+
+            function actualizarHidden() {
+                hidden.value = (selDia.value && selMes.value && selAnio.value)
+                    ? `${selAnio.value}-${selMes.value}-${selDia.value}`
+                    : '';
+            }
+
+            selMes.addEventListener('change', () => { pintarDias(); actualizarHidden(); });
+            selAnio.addEventListener('change', () => { pintarDias(); actualizarHidden(); });
+            selDia.addEventListener('change', actualizarHidden);
+
+            // Permite reiniciar el selector al limpiar el formulario
+            // (colgado del propio input oculto para no crear más globales).
+            hidden.resetDob = () => {
+                selDia.value = '';
+                selMes.value = '';
+                selAnio.value = '';
+                pintarDias();
+                hidden.value = '';
+            };
+        }
+
+        initDobGroup('loyaltyPhoneFechaGroup', 'loyaltyPhoneFechaInput');
+        initDobGroup('loyaltyQrFechaGroup', 'loyaltyQrInputFecha');
+
         const loyaltyPhoneAskView = document.getElementById('loyaltyPhoneAskView');
         const loyaltyPhoneInput = document.getElementById('loyaltyPhoneInput');
         const loyaltyPhoneError = document.getElementById('loyaltyPhoneError');
@@ -5757,7 +5896,7 @@
                 // otra vez este formulario con los datos ya guardados.
                 loyaltyPhoneInput.value = '';
                 loyaltyPhoneNombreInput.value = '';
-                loyaltyPhoneFechaInput.value = '';
+                loyaltyPhoneFechaInput.resetDob();
                 loyaltyPhoneAskView.hidden = true;
                 startLoyaltyTracking(user.uid);
 
@@ -5923,7 +6062,7 @@
             localStorage.removeItem(LOYALTY_QR_LS_KEY);
             document.getElementById('loyaltyQrInputTelefono').value = '';
             loyaltyQrInputNombre.value = '';
-            document.getElementById('loyaltyQrInputFecha').value = '';
+            document.getElementById('loyaltyQrInputFecha').resetDob();
             loyaltyQrMostrarPasoNombre();
         });
 
