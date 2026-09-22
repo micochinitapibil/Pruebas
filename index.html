@@ -2321,18 +2321,6 @@
 
         .loyalty-free-banner[hidden] { display: none; }
 
-        .loyalty-birthday-banner {
-            margin-top: 14px;
-            background: #ffe3ec;
-            border: 2px dashed #c2185b;
-            border-radius: 14px;
-            padding: 12px;
-            font-size: 13px;
-            font-weight: 700;
-            color: #c2185b;
-        }
-        .loyalty-birthday-banner[hidden] { display: none; }
-
         /* ============================================
            LOGIN DE CLIENTES
            ============================================ */
@@ -3600,7 +3588,6 @@
                     <div class="loyalty-progress-bar"><div class="loyalty-progress-fill" id="loyaltyQrProgressFill" style="width:0%;"></div></div>
                     <div class="loyalty-progress-text" id="loyaltyQrProgressText"></div>
                     <div class="loyalty-free-banner" id="loyaltyQrFreeBanner" hidden></div>
-                    <div class="loyalty-birthday-banner" id="loyaltyQrBirthdayBanner" hidden>🎂 ¡Hoy es tu cumpleaños! Puedes pedir tu regalo al finalizar tu pedido, o mostrarle este código al mesero.</div>
 
                     <div class="loyalty-qr-nota">Muéstrale este código al mesero para registrar tu visita o canjear tu platillo gratis.</div>
                     <button type="button" class="loyalty-qr-back" id="loyaltyQrReiniciarBtn" style="margin:0;">No soy yo — crear otro código</button>
@@ -6012,9 +5999,10 @@
             // Igual que myBirthdayEligibleToday para cuentas de Google, pero
             // usando la tarjeta mesaCuponera/{telefono} del invitado: así el
             // regalo de cumpleaños también se puede pedir desde aquí y no
-            // solo con el mesero o con cuenta de Google.
+            // solo con el mesero o con cuenta de Google. El aviso no se
+            // muestra en la tarjeta (para que se comporte igual que con
+            // cuenta de Google): se ofrece hasta que hace un pedido.
             myGuestBirthdayEligibleToday = esHoyElCumple(data.fechaNacimiento) && data.regaloCumpleAnioUsado !== new Date().getFullYear();
-            document.getElementById('loyaltyQrBirthdayBanner').hidden = !myGuestBirthdayEligibleToday;
         }
 
         function loyaltyQrEscucharTarjeta(id) {
