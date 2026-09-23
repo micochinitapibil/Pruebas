@@ -3426,9 +3426,6 @@
                     <button type="button" id="cartServiceSummaryChange">Cambiar</button>
                 </div>
                 <div class="cart-total-breakdown" id="cartTotal"></div>
-                <button class="cart-digital-btn" id="digitalOrderBtn">
-                    <i class="fas fa-bell-concierge"></i> Finalizar pedido
-                </button>
                 <button class="cart-checkout-btn" id="checkoutBtn">
                     <i class="fab fa-whatsapp"></i> Finalizar por WhatsApp
                 </button>
@@ -3689,6 +3686,19 @@
             <div id="addonsList"></div>
             <div class="addons-actions">
                 <button class="addons-main-btn state-skip" id="addonsMainBtn">No gracias, continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: AVISO ANTES DE ENVIAR POR WHATSAPP -->
+    <div class="addons-overlay" id="whatsappWarnOverlay">
+        <div class="addons-modal" style="text-align:center;">
+            <div style="font-size:42px; margin-bottom:6px;">📲</div>
+            <h3>Vas a enviar tu pedido por WhatsApp</h3>
+            <p class="addons-subtitle">Envíalo tal como aparece, sin editarlo. Si quieres agregar, quitar o cambiar algo, regresa y ajusta tu pedido aquí antes de continuar.</p>
+            <div class="addons-actions">
+                <button class="addons-skip-btn" id="whatsappWarnBackBtn">Regresar y editar</button>
+                <button class="addons-continue-btn" id="whatsappWarnConfirmBtn"><i class="fab fa-whatsapp"></i> Entendido, enviar pedido</button>
             </div>
         </div>
     </div>
@@ -4550,7 +4560,6 @@
         const cartItemsEl = document.getElementById('cartItems');
         const cartTotalEl = document.getElementById('cartTotal');
         const checkoutBtn = document.getElementById('checkoutBtn');
-        const digitalOrderBtn = document.getElementById('digitalOrderBtn');
         const cartToastBtn = document.getElementById('cartToastBtn');
         const cartToastText = document.getElementById('cartToastText');
 
@@ -4925,12 +4934,8 @@
             const hasAddons = totalAddonsQty() > 0;
             if (hasAddons) {
                 addonsMainBtn.classList.remove('state-skip');
-                addonsMainBtn.classList.add('state-continue');
-                addonsMainBtn.classList.toggle('type-whatsapp', pendingCheckoutType === 'whatsapp');
-                addonsMainBtn.classList.toggle('type-digital', pendingCheckoutType === 'digital');
-                addonsMainBtn.innerHTML = pendingCheckoutType === 'whatsapp'
-                    ? '<i class="fab fa-whatsapp"></i> Finalizar pedido'
-                    : '<i class="fas fa-check"></i> Finalizar pedido';
+                addonsMainBtn.classList.add('state-continue', 'type-whatsapp');
+                addonsMainBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Finalizar pedido';
             } else {
                 addonsMainBtn.classList.remove('state-continue', 'type-whatsapp', 'type-digital');
                 addonsMainBtn.classList.add('state-skip');
@@ -4996,6 +5001,18 @@
                 message += `• ${c.qty}x ${c.name} — ${c.price}\n`;
             });
 
+            // El platillo gratis (cupón) y/o el regalo de cumpleaños se
+            // eligen en los modales previos, pero antes solo se reflejaban
+            // en el pedido digital — nunca en el texto de WhatsApp. Como
+            // ahora el mensaje de WhatsApp es la instrucción real para la
+            // cocina, hay que avisarles aquí también.
+            if (redeemedFreeItem) {
+                message += `\n🎁 Platillo GRATIS (cupón de lealtad): ${redeemedFreeItem.name}\n`;
+            }
+            if (redeemedBirthdayItem) {
+                message += `\n🎂 Platillo de regalo (cumpleaños): ${redeemedBirthdayItem.name}\n`;
+            }
+
             const addonsChosen = ADDONS.filter(a => (addonQuantities[a.name] || 0) > 0);
             let addonsTotal = 0;
             if (addonsChosen.length > 0) {
@@ -5041,30 +5058,60 @@
 
         addonsMainBtn.addEventListener('click', () => {
             closeAddonsModal();
-            if (pendingCheckoutType === 'digital') sendDigitalOrder(); else sendWhatsAppOrder();
+            whatsappWarnOverlay.classList.add('active');
         });
 
-        let pendingCheckoutType = 'whatsapp'; // 'whatsapp' | 'digital'
+        // ============================================
+        // AVISO ANTES DE ENVIAR POR WHATSAPP
+        // Antes había dos botones (uno guardaba el pedido en el sistema,
+        // otro solo abría WhatsApp). Ahora solo queda el de WhatsApp, pero
+        // por dentro hace las dos cosas: abre WhatsApp con el pedido
+        // (como espera el cliente) y, en paralelo, guarda una copia en
+        // el sistema (comandas) como respaldo y para la cuponera/puntos.
+        // Como el cliente ya no ve el paso "digital", este aviso es la
+        // única oportunidad de pedirle que no edite el mensaje antes de
+        // enviarlo, porque una vez que toca "Enviar" en WhatsApp, esta
+        // página ya no tiene ninguna forma de saber si lo cambió.
+        // ============================================
+        const whatsappWarnOverlay = document.getElementById('whatsappWarnOverlay');
+
+        document.getElementById('whatsappWarnBackBtn').addEventListener('click', () => {
+            whatsappWarnOverlay.classList.remove('active');
+        });
+
+        whatsappWarnOverlay.addEventListener('click', (e) => {
+            if (e.target === whatsappWarnOverlay) whatsappWarnOverlay.classList.remove('active');
+        });
+
+        document.getElementById('whatsappWarnConfirmBtn').addEventListener('click', () => {
+            whatsappWarnOverlay.classList.remove('active');
+
+            // sendWhatsAppOrder() es síncrona y debe llamarse aquí mismo,
+            // dentro del propio clic del usuario: si se llamara después de
+            // un await, el navegador puede bloquear la apertura de
+            // WhatsApp por considerarla un pop-up no solicitado.
+            sendWhatsAppOrder();
+
+            // sendDigitalOrder() es el respaldo silencioso: toma su propia
+            // "foto" del carrito antes de que lo vaciemos abajo (lee todo
+            // lo que necesita antes de su primer await), así que este
+            // orden es seguro.
+            sendDigitalOrder();
+
+            addonQuantities = {};
+            cart = [];
+            redeemedFreeItem = null;
+            redeemedBirthdayItem = null;
+            updateCartBadge();
+            closeCart();
+        });
 
         function continueCheckoutFlow() {
-            if (pendingCheckoutType === 'digital') maybeOfferBirthday();
-            else openAddonsModal();
+            maybeOfferBirthday();
         }
 
         checkoutBtn.addEventListener('click', () => {
             if (cart.length === 0) return;
-            pendingCheckoutType = 'whatsapp';
-            if (orderType === null) {
-                pendingOrderTypeThenCheckout = true;
-                reopenOrderType();
-                return;
-            }
-            openAddonsModal();
-        });
-
-        digitalOrderBtn.addEventListener('click', () => {
-            if (cart.length === 0) return;
-            pendingCheckoutType = 'digital';
             if (orderType === null) {
                 pendingOrderTypeThenCheckout = true;
                 reopenOrderType();
@@ -5291,15 +5338,20 @@
             pickup: 'Recoger en el local'
         };
 
+        // Ya no controla lo que ve el cliente (eso lo hace el clic de
+        // "Entendido, enviar pedido": abre WhatsApp y vacía el carrito de
+        // inmediato). Esta función solo guarda una copia de respaldo en
+        // Firestore para admin/comandas y para la cuponera/puntos. Si algo
+        // aquí falla, el cliente NUNCA se entera —su pedido real ya se fue
+        // por WhatsApp— pero sí lo dejamos en la consola para revisarlo.
         async function sendDigitalOrder() {
-            digitalOrderBtn.disabled = true;
             try {
-                // Capturamos el carrito y los adicionales ANTES de tocar la
-                // sesión (signInAnonymously puede disparar una limpieza de
-                // sesión si es la primera vez que se crea la cuenta de
-                // invitado) para que nada pueda vaciarlos a la mitad del envío.
+                // Capturamos todo ANTES de tocar la sesión o de que el
+                // clic que nos llamó vacíe el carrito justo después.
                 const cartSnapshot = cart.slice();
                 const addonQuantitiesSnapshot = { ...addonQuantities };
+                const redeemedFreeSnapshot = redeemedFreeItem;
+                const redeemedBirthdaySnapshot = redeemedBirthdayItem;
 
                 if (!auth.currentUser) {
                     await auth.signInAnonymously();
@@ -5324,11 +5376,11 @@
                 const qrTelefono = user.isAnonymous ? localStorage.getItem(LOYALTY_QR_LS_KEY) : null;
 
                 const items = cartSnapshot.map(c => ({ name: c.name, qty: c.qty, price: parsePrice(c.price) }));
-                if (redeemedFreeItem) {
-                    items.push({ name: redeemedFreeItem.name, qty: 1, price: 0, freeRedeemed: true });
+                if (redeemedFreeSnapshot) {
+                    items.push({ name: redeemedFreeSnapshot.name, qty: 1, price: 0, freeRedeemed: true });
                 }
-                if (redeemedBirthdayItem) {
-                    items.push({ name: redeemedBirthdayItem.name, qty: 1, price: 0, freeBirthdayRedeemed: true });
+                if (redeemedBirthdaySnapshot) {
+                    items.push({ name: redeemedBirthdaySnapshot.name, qty: 1, price: 0, freeBirthdayRedeemed: true });
                 }
 
                 const cartSubtotal = cartSnapshot.reduce((sum, c) => sum + parsePrice(c.price) * c.qty, 0);
@@ -5351,95 +5403,90 @@
                     customerName: user.isAnonymous ? null : (user.displayName || null),
                     telefono: qrTelefono || null,
                     countsForLoyalty: !user.isAnonymous || !!qrTelefono,
-                    freeDishRedeemed: redeemedFreeItem ? redeemedFreeItem.name : null,
-                    freeBirthdayRedeemed: redeemedBirthdayItem ? redeemedBirthdayItem.name : null
+                    freeDishRedeemed: redeemedFreeSnapshot ? redeemedFreeSnapshot.name : null,
+                    freeBirthdayRedeemed: redeemedBirthdaySnapshot ? redeemedBirthdaySnapshot.name : null
                 };
 
                 const newOrderRef = db.collection('comandas').doc();
 
-                if ((redeemedFreeItem || redeemedBirthdayItem) && !user.isAnonymous) {
-                    // Transacción: solo se guarda el pedido si el cupón y/o el
-                    // regalo de cumpleaños siguen disponibles en ese instante,
-                    // y se descuentan/marcan a la vez (evita que se usen dos
-                    // veces desde dos pestañas/dispositivos).
-                    const anioActual = new Date().getFullYear();
-                    await db.runTransaction(async (tx) => {
-                        const clienteRef = db.collection('clientes').doc(user.uid);
-                        const clienteDoc = await tx.get(clienteRef);
-                        const clienteData = clienteDoc.exists ? clienteDoc.data() : {};
-                        const updates = {};
-                        if (redeemedFreeItem) {
-                            const free = clienteData.freeDishesAvailable || 0;
-                            if (free < 1) {
-                                throw new Error('CUPON_NO_DISPONIBLE');
+                try {
+                    if ((redeemedFreeSnapshot || redeemedBirthdaySnapshot) && !user.isAnonymous) {
+                        // Transacción: solo se descuenta el cupón y/o el
+                        // regalo de cumpleaños si siguen disponibles en ese
+                        // instante (evita que se usen dos veces desde dos
+                        // dispositivos).
+                        const anioActual = new Date().getFullYear();
+                        await db.runTransaction(async (tx) => {
+                            const clienteRef = db.collection('clientes').doc(user.uid);
+                            const clienteDoc = await tx.get(clienteRef);
+                            const clienteData = clienteDoc.exists ? clienteDoc.data() : {};
+                            const updates = {};
+                            if (redeemedFreeSnapshot) {
+                                const free = clienteData.freeDishesAvailable || 0;
+                                if (free < 1) {
+                                    throw new Error('CUPON_NO_DISPONIBLE');
+                                }
+                                updates.freeDishesAvailable = free - 1;
                             }
-                            updates.freeDishesAvailable = free - 1;
-                        }
-                        if (redeemedBirthdayItem) {
-                            if (clienteData.regaloCumpleAnioUsado === anioActual) {
-                                throw new Error('CUMPLE_NO_DISPONIBLE');
+                            if (redeemedBirthdaySnapshot) {
+                                if (clienteData.regaloCumpleAnioUsado === anioActual) {
+                                    throw new Error('CUMPLE_NO_DISPONIBLE');
+                                }
+                                updates.regaloCumpleAnioUsado = anioActual;
                             }
-                            updates.regaloCumpleAnioUsado = anioActual;
-                        }
-                        tx.set(clienteRef, updates, { merge: true });
-                        tx.set(newOrderRef, orderData);
-                    });
-                } else if ((redeemedFreeItem || redeemedBirthdayItem) && user.isAnonymous && qrTelefono) {
-                    // Invitado sin cuenta de Google, pero con tarjeta QR: la
-                    // variable primaria aquí es el teléfono (mesaCuponera/{telefono}),
-                    // así que el platillo gratis y/o el regalo de cumpleaños se
-                    // marcan ahí mismo — igual que si los canjeara el mesero
-                    // desde meseros.html — en vez de en clientes/{uid}, que
-                    // para un invitado no existe.
-                    const anioActual = new Date().getFullYear();
-                    const tarjetaRef = db.collection('mesaCuponera').doc(qrTelefono);
-                    await db.runTransaction(async (tx) => {
-                        const tarjetaDoc = await tx.get(tarjetaRef);
-                        const tarjetaData = tarjetaDoc.exists ? tarjetaDoc.data() : {};
-                        const updates = {};
-                        if (redeemedFreeItem) {
-                            const free = tarjetaData.freeDishesAvailable || 0;
-                            if (free < 1) {
-                                throw new Error('CUPON_NO_DISPONIBLE');
+                            tx.set(clienteRef, updates, { merge: true });
+                            tx.set(newOrderRef, orderData);
+                        });
+                    } else if ((redeemedFreeSnapshot || redeemedBirthdaySnapshot) && user.isAnonymous && qrTelefono) {
+                        // Invitado sin cuenta de Google, pero con tarjeta QR:
+                        // el platillo gratis y/o el regalo de cumpleaños se
+                        // marcan en mesaCuponera/{telefono} — igual que si
+                        // los canjeara el mesero desde meseros.html.
+                        const anioActual = new Date().getFullYear();
+                        const tarjetaRef = db.collection('mesaCuponera').doc(qrTelefono);
+                        await db.runTransaction(async (tx) => {
+                            const tarjetaDoc = await tx.get(tarjetaRef);
+                            const tarjetaData = tarjetaDoc.exists ? tarjetaDoc.data() : {};
+                            const updates = {};
+                            if (redeemedFreeSnapshot) {
+                                const free = tarjetaData.freeDishesAvailable || 0;
+                                if (free < 1) {
+                                    throw new Error('CUPON_NO_DISPONIBLE');
+                                }
+                                updates.freeDishesAvailable = free - 1;
                             }
-                            updates.freeDishesAvailable = free - 1;
-                        }
-                        if (redeemedBirthdayItem) {
-                            if (tarjetaData.regaloCumpleAnioUsado === anioActual) {
-                                throw new Error('CUMPLE_NO_DISPONIBLE');
+                            if (redeemedBirthdaySnapshot) {
+                                if (tarjetaData.regaloCumpleAnioUsado === anioActual) {
+                                    throw new Error('CUMPLE_NO_DISPONIBLE');
+                                }
+                                updates.regaloCumpleAnioUsado = anioActual;
                             }
-                            updates.regaloCumpleAnioUsado = anioActual;
-                        }
-                        tx.set(tarjetaRef, updates, { merge: true });
-                        tx.set(newOrderRef, orderData);
-                    });
-                } else {
+                            tx.set(tarjetaRef, updates, { merge: true });
+                            tx.set(newOrderRef, orderData);
+                        });
+                    } else {
+                        await newOrderRef.set(orderData);
+                    }
+                } catch (innerErr) {
+                    // El cupón/regalo ya no estaba disponible (por ejemplo,
+                    // se usó desde otro dispositivo justo antes de este
+                    // clic). El mensaje de WhatsApp ya salió mencionando
+                    // ese platillo gratis, así que de todos modos guardamos
+                    // el respaldo (sin descontar nada) para que el pedido
+                    // no se pierda; el negocio deberá revisarlo a mano.
+                    console.error('No se pudo aplicar el cupón/regalo en el respaldo digital; se guarda sin descontarlo:', innerErr);
                     await newOrderRef.set(orderData);
                 }
-
-                addonQuantities = {};
-                cart = [];
-                redeemedFreeItem = null;
-                redeemedBirthdayItem = null;
-                updateCartBadge();
-                closeCart();
                 // No hace falta "activar" nada más aquí: watchMyOrders() ya está
                 // escuchando todos los pedidos de este uid desde que inició sesión,
                 // así que en cuanto Firestore confirme este nuevo documento, el
                 // botón flotante "Mi pedido" aparece solo.
             } catch (err) {
-                console.error('Error al enviar la comanda digital:', err);
-                if (err.message === 'CUPON_NO_DISPONIBLE') {
-                    alert('Tu cupón de platillo gratis ya no está disponible (puede que se haya usado en otro dispositivo). Vuelve a intentar enviar tu pedido.');
-                    redeemedFreeItem = null;
-                } else if (err.message === 'CUMPLE_NO_DISPONIBLE') {
-                    alert('Tu regalo de cumpleaños ya fue usado este año (puede que se haya aplicado en otro dispositivo o con el mesero). Vuelve a intentar enviar tu pedido.');
-                    redeemedBirthdayItem = null;
-                } else {
-                    alert('No se pudo enviar tu pedido. Intenta de nuevo o usa el botón de WhatsApp.');
-                }
-            } finally {
-                digitalOrderBtn.disabled = false;
+                // Fallo total (sin internet, Firestore caído, etc). El
+                // cliente no se entera de nada: su pedido real ya llegó al
+                // restaurante por WhatsApp. Solo queda en la consola para
+                // poder revisarlo si hace falta.
+                console.error('No se pudo guardar el respaldo digital del pedido:', err);
             }
         }
 
@@ -6233,7 +6280,7 @@
             const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay', 'comboSuggestOverlay',
-                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
+                'addonsOverlay', 'whatsappWarnOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
                 'orderModalOverlay', 'loyaltyModalOverlay',
                 ...hiddenBasedIds
             ].map(id => document.getElementById(id)).filter(Boolean);
@@ -6290,7 +6337,7 @@
             const hiddenBasedIds = ['orderTypeOverlay', 'deliveryLocationOverlay', 'locationBlockedOverlay'];
             const overlays = [
                 'productModalOverlay', 'cartOverlay', 'prepOverlay', 'comboSuggestOverlay',
-                'addonsOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
+                'addonsOverlay', 'whatsappWarnOverlay', 'couponOfferOverlay', 'couponPickOverlay', 'dupNombreOverlay',
                 'orderModalOverlay', 'loyaltyModalOverlay',
                 ...hiddenBasedIds
             ].map(id => document.getElementById(id)).filter(Boolean);
