@@ -5084,6 +5084,7 @@
         let redeemedBirthdayItem = null; // { name } o null
         let myBirthdayEligibleToday = false; // true si hoy es su cumpleaños y no ha usado el regalo este año
         let myGuestBirthdayEligibleToday = false; // igual que arriba, pero para un invitado con tarjeta QR (identificado por su teléfono, no por cuenta de Google)
+        let myGuestFreeDishesAvailable = 0; // igual que myFreeDishesAvailable, pero para un invitado con tarjeta QR (mesaCuponera/{telefono})
 
         function esHoyElCumple(fechaNacimiento) {
             const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((fechaNacimiento || '').trim());
@@ -5189,7 +5190,16 @@
 
         function maybeOfferCoupon() {
             redeemedFreeItem = null;
-            const eligible = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myFreeDishesAvailable > 0;
+            // Igual que maybeOfferBirthday(): elegible por cuenta de Google,
+            // o elegible como invitado con tarjeta QR (identificado por el
+            // teléfono guardado en localStorage). Antes esta segunda opción
+            // no existía y por eso a los invitados sin cuenta nunca se les
+            // ofrecía canjear su platillo gratis al hacer un pedido, aunque
+            // su tarjeta mostrara que sí lo tenían disponible.
+            const eligibleCuenta = !isGuest && auth.currentUser && !auth.currentUser.isAnonymous && myFreeDishesAvailable > 0;
+            const eligibleInvitado = isGuest && auth.currentUser && auth.currentUser.isAnonymous
+                && !!localStorage.getItem(LOYALTY_QR_LS_KEY) && myGuestFreeDishesAvailable > 0;
+            const eligible = eligibleCuenta || eligibleInvitado;
             if (eligible) {
                 couponOfferOverlay.classList.add('active');
             } else {
@@ -5374,21 +5384,33 @@
                         tx.set(clienteRef, updates, { merge: true });
                         tx.set(newOrderRef, orderData);
                     });
-                } else if (redeemedBirthdayItem && user.isAnonymous && qrTelefono) {
+                } else if ((redeemedFreeItem || redeemedBirthdayItem) && user.isAnonymous && qrTelefono) {
                     // Invitado sin cuenta de Google, pero con tarjeta QR: la
                     // variable primaria aquí es el teléfono (mesaCuponera/{telefono}),
-                    // así que el regalo de cumpleaños se marca ahí mismo —
-                    // igual que si lo canjeara el mesero desde meseros.html —
-                    // en vez de en clientes/{uid}, que para un invitado no existe.
+                    // así que el platillo gratis y/o el regalo de cumpleaños se
+                    // marcan ahí mismo — igual que si los canjeara el mesero
+                    // desde meseros.html — en vez de en clientes/{uid}, que
+                    // para un invitado no existe.
                     const anioActual = new Date().getFullYear();
                     const tarjetaRef = db.collection('mesaCuponera').doc(qrTelefono);
                     await db.runTransaction(async (tx) => {
                         const tarjetaDoc = await tx.get(tarjetaRef);
                         const tarjetaData = tarjetaDoc.exists ? tarjetaDoc.data() : {};
-                        if (tarjetaData.regaloCumpleAnioUsado === anioActual) {
-                            throw new Error('CUMPLE_NO_DISPONIBLE');
+                        const updates = {};
+                        if (redeemedFreeItem) {
+                            const free = tarjetaData.freeDishesAvailable || 0;
+                            if (free < 1) {
+                                throw new Error('CUPON_NO_DISPONIBLE');
+                            }
+                            updates.freeDishesAvailable = free - 1;
                         }
-                        tx.set(tarjetaRef, { regaloCumpleAnioUsado: anioActual }, { merge: true });
+                        if (redeemedBirthdayItem) {
+                            if (tarjetaData.regaloCumpleAnioUsado === anioActual) {
+                                throw new Error('CUMPLE_NO_DISPONIBLE');
+                            }
+                            updates.regaloCumpleAnioUsado = anioActual;
+                        }
+                        tx.set(tarjetaRef, updates, { merge: true });
                         tx.set(newOrderRef, orderData);
                     });
                 } else {
@@ -5683,6 +5705,7 @@
             if (clienteUnsub) { clienteUnsub(); clienteUnsub = null; }
             myFreeDishesAvailable = 0;
             myGuestBirthdayEligibleToday = false;
+            myGuestFreeDishesAvailable = 0;
             miTelefonoActual = null;
             loyaltyUserView.hidden = true;
             document.getElementById('miQrBox').hidden = true;
@@ -5970,6 +5993,7 @@
             loyaltyQrPasoTarjeta.hidden = true;
             loyaltyQrPasoNombre.hidden = false;
             myGuestBirthdayEligibleToday = false;
+            myGuestFreeDishesAvailable = 0;
         }
 
         function loyaltyQrPintarTarjeta(id, data) {
@@ -5985,6 +6009,8 @@
 
             document.getElementById('loyaltyQrProgressFill').style.width = pct + '%';
             document.getElementById('loyaltyQrProgressText').textContent = `${progressInCycle} de ${LOYALTY_THRESHOLD} visitas`;
+
+            myGuestFreeDishesAvailable = free;
 
             const banner = document.getElementById('loyaltyQrFreeBanner');
             if (free > 0) {
