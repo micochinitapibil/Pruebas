@@ -186,6 +186,33 @@
         color: var(--red);
         border-color: rgba(192,57,43,0.4);
     }
+    /* Iconos de editar / quitar producto en la ficha de mesa */
+    .item-actual-row { align-items: center; gap: 8px; }
+    .item-actual-row .precio-fila { white-space: nowrap; }
+    .item-actual-row .acciones-fila { display: flex; gap: 4px; flex-shrink: 0; }
+    .btn-icono {
+        width: 34px; height: 34px;
+        border: 1.5px solid rgba(0,0,0,0.12);
+        background: #fff; border-radius: 10px;
+        font-size: 15px; line-height: 1; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        padding: 0;
+    }
+    .btn-icono.borrar { border-color: rgba(192,57,43,0.4); }
+    .btn-icono:disabled { opacity: 0.5; }
+    .editar-cant { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 6px 0 16px; }
+    .editar-cant button {
+        width: 44px; height: 44px; border-radius: 50%;
+        border: 2px solid var(--primary); background: #fff;
+        font-size: 22px; font-weight: 800; color: var(--secondary); cursor: pointer;
+    }
+    .editar-cant .cant-num { font-size: 22px; font-weight: 800; min-width: 34px; text-align: center; }
+    .editar-label { display: block; font-size: 12.5px; font-weight: 700; color: var(--secondary); margin: 10px 0 6px; }
+    .editar-select {
+        width: 100%; padding: 12px; border-radius: 12px;
+        border: 2px solid var(--primary); background: #fff;
+        font-family: inherit; font-size: 14.5px; color: #333;
+    }
 
     /* ===== MENÚ ===== */
     #menuScreen { padding-bottom: 110px; }
@@ -687,6 +714,25 @@
         <button type="button" class="btn-primario" id="btnAgregarPedido">Agregar pedido</button>
         <button type="button" class="btn-secundario btn-peligro" id="btnLiberarMesa">Liberar mesa</button>
         <button type="button" class="btn-secundario" id="btnCerrarFicha">Cerrar</button>
+        <button type="button" class="btn-secundario btn-peligro" id="btnCancelarOrden">Cancelar orden</button>
+    </div>
+</div>
+
+<!-- ===== EDITAR / REEMPLAZAR PRODUCTO DE LA COMANDA ===== -->
+<div class="overlay" id="editarItemOverlay" hidden>
+    <div class="hoja">
+        <h2>Editar producto</h2>
+        <div class="estado-txt" id="editarItemSub" style="color:#a08a5f;"></div>
+        <label class="editar-label" for="editarItemProducto">Producto (elige otro para reemplazarlo)</label>
+        <select class="editar-select" id="editarItemProducto"></select>
+        <label class="editar-label">Cantidad</label>
+        <div class="editar-cant">
+            <button type="button" id="editarCantMenos">−</button>
+            <span class="cant-num" id="editarCantNum">1</span>
+            <button type="button" id="editarCantMas">+</button>
+        </div>
+        <button type="button" class="btn-primario" id="btnGuardarEdicion">Guardar cambios</button>
+        <button type="button" class="btn-secundario" id="btnCancelarEdicion">Cancelar</button>
     </div>
 </div>
 
@@ -929,6 +975,9 @@
         snap.forEach(doc => { mesasData[doc.id] = doc.data(); });
         actualizarListenersComandas();
         pintarMesas();
+        // Si la ficha de una mesa está abierta, se refresca con los datos nuevos
+        // (por ejemplo después de editar o quitar un producto).
+        if (mesaActualNum && !fichaMesaOverlay.hidden) abrirFichaMesa(mesaActualNum);
     });
 
     function pintarMesas() {
@@ -980,14 +1029,19 @@
         const items = data.items || [];
         if (items.length) {
             const total = items.reduce((s, it) => s + it.price * it.qty, 0);
-            itemsCont.innerHTML = items.map(it => `
-                <div class="item-actual-row"><span class="nom">${it.qty}x ${it.name}${it.gratis ? ' <span style="color:#2f7a56;font-weight:700;">🎁 gratis</span>' : ''}</span><span>MX$${(it.price * it.qty).toFixed(2)}</span></div>
+            const editable = data.estado === 'ocupada' && !!data.comandaId && estadoComanda !== 'entregado';
+            itemsCont.innerHTML = items.map((it, idx) => `
+                <div class="item-actual-row"><span class="nom">${it.qty}x ${it.name}${it.gratis ? ' <span style="color:#2f7a56;font-weight:700;">🎁 gratis</span>' : ''}</span><span class="precio-fila">MX$${(it.price * it.qty).toFixed(2)}</span>${editable ? `<span class="acciones-fila">${it.gratis ? '' : `<button type="button" class="btn-icono editar" data-idx="${idx}" title="Editar o reemplazar">✏️</button>`}<button type="button" class="btn-icono borrar" data-idx="${idx}" title="Quitar producto">🗑️</button></span>` : ''}</div>
             `).join('') + `<div class="total-actual"><span>Total</span><span>MX$${total.toFixed(2)}</span></div>`;
+            itemsCont.querySelectorAll('.btn-icono.editar').forEach(b => b.addEventListener('click', () => abrirEditarItem(parseInt(b.dataset.idx, 10))));
+            itemsCont.querySelectorAll('.btn-icono.borrar').forEach(b => b.addEventListener('click', () => quitarItemMesa(parseInt(b.dataset.idx, 10), b)));
         } else {
             itemsCont.innerHTML = '<div style="font-size:13.5px;color:#a08a5f;">Sin pedido todavía.</div>';
         }
 
         document.getElementById('btnLiberarMesa').style.display = data.estado === 'ocupada' ? 'block' : 'none';
+        document.getElementById('btnCancelarOrden').style.display =
+            (data.estado === 'ocupada' && !!data.comandaId && estadoComanda !== 'entregado') ? 'block' : 'none';
         fichaMesaOverlay.removeAttribute('hidden');
     }
 
@@ -1007,6 +1061,214 @@
         fichaMesaOverlay.setAttribute('hidden', '');
         abrirMenuParaMesa(mesaActualNum);
     });
+
+    // ==================================================
+    // EDITAR / QUITAR PRODUCTOS Y CANCELAR ORDEN (desde la ficha de mesa)
+    // La fuente real es la comanda (comandas/{id}); la mesa
+    // (mesasEstado) se reconstruye con el mismo criterio de agrupado
+    // que usa "Guardar pedido". Solo funciona mientras la comanda no
+    // esté "Entregado" (para eso está "Agregar pedido").
+    // ==================================================
+    function escHtml(t) {
+        return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function claveItemMesa(it) { return it.name + '::' + it.price + (it.gratis ? '::gratis' : ''); }
+
+    function limpiarDividers(items) {
+        const out = [];
+        items.forEach((it, i) => {
+            if (it.divider) {
+                const sig = items[i + 1];
+                if (!sig || sig.divider || out.length === 0) return;
+            }
+            out.push(it);
+        });
+        return out;
+    }
+
+    function tallyDeItems(items) {
+        const map = {};
+        items.filter(i => !i.divider).forEach(it => {
+            const k = claveItemMesa(it);
+            if (map[k]) map[k].qty += it.qty; else map[k] = { ...it };
+        });
+        return Object.values(map);
+    }
+
+    async function leerComandaMesa() {
+        const data = mesasData[mesaActualNum] || {};
+        if (!data.comandaId) return null;
+        const ref = db.collection('comandas').doc(data.comandaId);
+        const snap = await ref.get();
+        return { ref, existe: snap.exists, items: snap.exists ? (snap.data().items || []) : [], status: snap.exists ? snap.data().status : null };
+    }
+
+    function avisoEstadoComanda() {
+        const st = comandaEstadoPorMesa[mesaActualNum];
+        return (st === 'preparando' || st === 'listo')
+            ? '\n\n⚠️ Cocina ya la marcó como "' + st + '". Avísales del cambio.'
+            : '';
+    }
+
+    // Devuelve el cupón (o la marca de regalo de cumpleaños) de un platillo
+    // gratis que se está quitando de una comanda ya guardada. Misma lógica
+    // que el botón "Quitar" de los chips 🎁 del menú.
+    async function devolverGratis(it) {
+        if (!it || !it.gratis || !it.tarjetaId) return;
+        try {
+            const ref = db.collection('mesaCuponera').doc(it.tarjetaId);
+            if (it.esCumple) {
+                const updates = { regaloCumpleAnioUsado: firebase.firestore.FieldValue.delete() };
+                if (it.fusionadaConUid) {
+                    const batch = db.batch();
+                    batch.update(ref, updates);
+                    batch.update(clientesRef.doc(it.fusionadaConUid), updates);
+                    await batch.commit();
+                } else {
+                    await ref.update(updates);
+                }
+            } else {
+                const doc = await ref.get();
+                if (doc.exists) {
+                    await ref.update({ freeDishesAvailable: (doc.data().freeDishesAvailable || 0) + 1 });
+                }
+            }
+        } catch (err) {
+            console.error('Error devolviendo el platillo gratis:', err);
+            alert('No se pudo devolver el cupón/regalo de "' + it.name + '" a la tarjeta. Devuélvelo a mano desde el panel de admin.');
+        }
+    }
+
+    // Guarda la lista nueva de items en la comanda y en la mesa.
+    async function guardarItemsComanda(info, nuevosItems) {
+        const limpios = limpiarDividers(nuevosItems);
+        const reales = limpios.filter(i => !i.divider);
+        const total = reales.reduce((s, it) => s + it.qty * it.price, 0);
+        await info.ref.update({ items: limpios, subtotal: total, total: total });
+        await db.collection('mesasEstado').doc(String(mesaActualNum)).update({
+            items: tallyDeItems(limpios),
+            total: total,
+            actualizada: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    }
+
+    async function quitarItemMesa(idx, boton) {
+        const data = mesasData[mesaActualNum] || {};
+        const fila = (data.items || [])[idx];
+        if (!fila) return;
+        const unico = (data.items || []).length === 1;
+        if (unico) {
+            // Quitar el único producto = cancelar toda la orden.
+            return cancelarOrdenMesa('Es el único producto de la mesa, así que se cancelará toda la orden.\n\n');
+        }
+        if (!confirm('¿Quitar ' + fila.qty + 'x ' + fila.name + ' de la orden?' + avisoEstadoComanda())) return;
+        if (boton) boton.disabled = true;
+        try {
+            const info = await leerComandaMesa();
+            if (!info || !info.existe) { alert('No se encontró la comanda de esta mesa.'); return; }
+            const clave = claveItemMesa(fila);
+            const quitados = info.items.filter(x => !x.divider && claveItemMesa(x) === clave);
+            const restantes = info.items.filter(x => x.divider || claveItemMesa(x) !== clave);
+            await guardarItemsComanda(info, restantes);
+            for (const q of quitados) await devolverGratis(q);
+        } catch (err) {
+            console.error('Error quitando el producto:', err);
+            alert('No se pudo quitar el producto.\n\nDetalle técnico: ' + (err && err.message ? err.message : err));
+        } finally {
+            if (boton) boton.disabled = false;
+        }
+    }
+
+    // ----- Editar / reemplazar -----
+    let editandoFila = null;   // fila (tally) que se está editando
+    let editandoCant = 1;
+    const editarItemOverlay = document.getElementById('editarItemOverlay');
+    const editarItemProducto = document.getElementById('editarItemProducto');
+
+    function abrirEditarItem(idx) {
+        const data = mesasData[mesaActualNum] || {};
+        const fila = (data.items || [])[idx];
+        if (!fila || fila.gratis) return;
+        editandoFila = fila;
+        editandoCant = fila.qty;
+        document.getElementById('editarItemSub').textContent = 'Ahora: ' + fila.qty + 'x ' + fila.name + ' — MX$' + fila.price.toFixed(2) + ' c/u';
+        editarItemProducto.innerHTML =
+            '<option value="-1">' + escHtml(fila.name) + ' (actual)</option>' +
+            menuItems.map((m, i) => m.name === fila.name ? '' : '<option value="' + i + '">' + escHtml(m.name) + ' — MX$' + m.price.toFixed(2) + '</option>').join('');
+        editarItemProducto.value = '-1';
+        document.getElementById('editarCantNum').textContent = editandoCant;
+        editarItemOverlay.removeAttribute('hidden');
+    }
+    function cerrarEditarItem() { editarItemOverlay.setAttribute('hidden', ''); editandoFila = null; }
+
+    document.getElementById('editarCantMenos').addEventListener('click', () => {
+        if (editandoCant > 1) { editandoCant--; document.getElementById('editarCantNum').textContent = editandoCant; }
+    });
+    document.getElementById('editarCantMas').addEventListener('click', () => {
+        if (editandoCant < 99) { editandoCant++; document.getElementById('editarCantNum').textContent = editandoCant; }
+    });
+    document.getElementById('btnCancelarEdicion').addEventListener('click', cerrarEditarItem);
+    editarItemOverlay.addEventListener('click', (e) => { if (e.target === editarItemOverlay) cerrarEditarItem(); });
+
+    document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
+        if (!editandoFila) return;
+        const fila = editandoFila;
+        const sel = parseInt(editarItemProducto.value, 10);
+        const nuevo = sel === -1 ? { name: fila.name, price: fila.price } : menuItems[sel];
+        if (!nuevo) return;
+        if (nuevo.name === fila.name && nuevo.price === fila.price && editandoCant === fila.qty) { cerrarEditarItem(); return; }
+        if (!confirm('¿Guardar el cambio?\n\n' + fila.qty + 'x ' + fila.name + '  →  ' + editandoCant + 'x ' + nuevo.name + avisoEstadoComanda())) return;
+
+        const btn = document.getElementById('btnGuardarEdicion');
+        btn.disabled = true;
+        try {
+            const info = await leerComandaMesa();
+            if (!info || !info.existe) { alert('No se encontró la comanda de esta mesa.'); return; }
+            const clave = claveItemMesa(fila);
+            let puesto = false;
+            const nuevos = [];
+            info.items.forEach(x => {
+                if (!x.divider && claveItemMesa(x) === clave) {
+                    if (!puesto) { nuevos.push({ name: nuevo.name, price: nuevo.price, qty: editandoCant }); puesto = true; }
+                } else {
+                    nuevos.push(x);
+                }
+            });
+            await guardarItemsComanda(info, nuevos);
+            cerrarEditarItem();
+        } catch (err) {
+            console.error('Error editando el producto:', err);
+            alert('No se pudo guardar el cambio.\n\nDetalle técnico: ' + (err && err.message ? err.message : err));
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // ----- Cancelar orden completa (borra la comanda y libera la mesa) -----
+    async function cancelarOrdenMesa(prefijo) {
+        if (!mesaActualNum) return;
+        if (!confirm((prefijo || '') + '¿Cancelar la orden completa de la Mesa ' + mesaActualNum + '?\n\nSe elimina la comanda y la mesa queda libre. No se puede deshacer.' + avisoEstadoComanda())) return;
+        const btn = document.getElementById('btnCancelarOrden');
+        btn.disabled = true;
+        try {
+            const info = await leerComandaMesa();
+            if (info && info.existe) {
+                await info.ref.delete();
+                for (const it of info.items.filter(x => !x.divider && x.gratis)) await devolverGratis(it);
+            }
+            await db.collection('mesasEstado').doc(String(mesaActualNum)).set({
+                estado: 'libre', mesero: null, items: [], total: 0, comandaId: null,
+                actualizada: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            fichaMesaOverlay.setAttribute('hidden', '');
+        } catch (err) {
+            console.error('Error cancelando la orden:', err);
+            alert('No se pudo cancelar la orden.\n\nDetalle técnico: ' + (err && err.message ? err.message : err));
+        } finally {
+            btn.disabled = false;
+        }
+    }
+    document.getElementById('btnCancelarOrden').addEventListener('click', () => cancelarOrdenMesa(''));
 
     // ==================================================
     // MENÚ (mismo criterio que index.html: productos activos de Firestore)
