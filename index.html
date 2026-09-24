@@ -3550,6 +3550,9 @@
                 <input type="hidden" id="loyaltyPhoneFechaInput">
                 <div class="loyalty-phone-hint">Nombre y fecha de nacimiento son opcionales</div>
                 <button type="button" class="google-btn" id="loyaltyPhoneGuardarBtn" style="background:var(--primary); color:white; border-color:var(--primary);">Guardar</button>
+                <div style="text-align:center; margin-top:12px;">
+                    <button type="button" class="loyalty-qr-back" id="loyaltyPhoneCancelBtn" style="margin:0;">Cancelar — no quiero registrarme</button>
+                </div>
             </div>
 
             <!-- Vista para invitados que prefieren un código QR en vez de cuenta -->
@@ -5755,6 +5758,7 @@
             myGuestFreeDishesAvailable = 0;
             miTelefonoActual = null;
             loyaltyUserView.hidden = true;
+            document.getElementById('loyaltyPhoneAskView').hidden = true;
             document.getElementById('miQrBox').hidden = true;
             loyaltyFabBadge.hidden = true;
 
@@ -6251,6 +6255,22 @@
                 dupBtnCancelar.addEventListener('click', onCerrar);
             });
         }
+
+        // Si alguien entró con Google pero se arrepiente antes de dar su
+        // teléfono, antes no había forma de salir: la cuenta se quedaba
+        // iniciada y el formulario volvía a aparecer cada vez que se tocaba
+        // el botón del regalito. Ahora "Cancelar" limpia el formulario,
+        // cierra la sesión (vuelve a invitado) y cierra la ventana.
+        document.getElementById('loyaltyPhoneCancelBtn').addEventListener('click', () => {
+            loyaltyPhoneInput.value = '';
+            loyaltyPhoneNombreInput.value = '';
+            loyaltyPhoneFechaInput.resetDob();
+            loyaltyPhoneError.style.display = 'none';
+            loyaltyPhoneAskView.hidden = true;
+            loyaltyModalOverlay.classList.remove('active');
+            isGuest = false;
+            auth.signOut();
+        });
 
         loyaltyFab.addEventListener('click', () => {
             // Cada vez que se abre el botón flotante se vuelve a revisar el
